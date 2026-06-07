@@ -2,7 +2,7 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 env:
   REGISTRY: ghcr.io
@@ -85,7 +85,7 @@ jobs:
           script: |
             set -euo pipefail
             cd /opt/sushkobot/app
-            git pull origin main
+            git pull origin master
 
             ENV_FILE=/opt/sushkobot/.env
             touch "$ENV_FILE"

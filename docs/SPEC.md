@@ -466,7 +466,7 @@ No real Telegram in CI.
 
 ```mermaid
 flowchart LR
-  pushMain[push main] --> testJob[test job]
+  pushMaster[push master] --> testJob[test job]
   testJob --> buildPush[build-push GHCR]
   buildPush --> deployJob[SSH deploy]
   deployJob --> vpsCompose[docker compose pull]
@@ -478,7 +478,7 @@ flowchart LR
 | Workflow | Trigger | Jobs |
 |----------|---------|------|
 | [`ci.yml`](../.github/workflows/ci.yml) | PR | lint, typecheck, test |
-| [`deploy.yml`](../.github/workflows/deploy.yml) | push `main` | test → build-push → deploy |
+| [`deploy.yml`](../.github/workflows/deploy.yml) | push `master` | test → build-push → deploy |
 
 **GHCR tags:** `ghcr.io/<owner>/sushkobot:latest` and `:sha-<7-char-commit>`
 

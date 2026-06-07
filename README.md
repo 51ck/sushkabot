@@ -94,7 +94,7 @@ Add the matching public key to `~/.ssh/authorized_keys` on the VPS.
 
 ### Deploy flow
 
-On every push to `main`:
+On every push to `master`:
 
 1. **test** — lint, typecheck, `bun test`
 2. **build-push** — Docker image → `ghcr.io/<owner>/sushkobot:latest` and `:sha-<commit>`
