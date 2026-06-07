@@ -3,7 +3,6 @@ import type { Bot } from "grammy";
 import { members } from "../../db/schema.ts";
 import { texts } from "../../texts.ts";
 import type { BotContext } from "../context.ts";
-import { safeEditMessageText } from "../safe-edit.ts";
 import {
   buildDmTimezoneKeyboard,
   buildTimezoneCityKeyboard,
@@ -11,6 +10,7 @@ import {
   parseDmTimezoneCallback,
   SETTINGS_PREFIX,
 } from "../keyboards/settings-wizard.ts";
+import { safeEditMessageText } from "../safe-edit.ts";
 
 const DM_PREFIX = `${SETTINGS_PREFIX}dm:`;
 

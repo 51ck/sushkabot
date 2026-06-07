@@ -195,12 +195,16 @@ export async function upsertChat(
       .set({ ...data, enabled: true })
       .where(eq(chats.id, existing.id))
       .returning();
-    return updated[0]!;
+    const row = updated[0];
+    if (!row) throw new Error("Failed to update chat");
+    return row;
   }
 
   const inserted = await db
     .insert(chats)
     .values({ ...data, enabled: true })
     .returning();
-  return inserted[0]!;
+  const row = inserted[0];
+  if (!row) throw new Error("Failed to insert chat");
+  return row;
 }

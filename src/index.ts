@@ -1,5 +1,5 @@
-import { registerBotCommands } from "./bot/commands.ts";
 import { createBot } from "./bot/bot.ts";
+import { registerBotCommands } from "./bot/commands.ts";
 import { createDatabase, initDb } from "./db/client.ts";
 import { runMigrations } from "./db/migrate.ts";
 import { env } from "./env.ts";

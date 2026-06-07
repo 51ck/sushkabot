@@ -1,12 +1,19 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import type { Update } from "grammy/types";
 import { createBot } from "../../src/bot/bot.ts";
 import { chats, dailyWindows } from "../../src/db/schema.ts";
+import { fixedNow, resetClock } from "../helpers/clock.ts";
 import { createTestDb } from "../helpers/db.ts";
 
 describe("checkin callback handler", () => {
+  afterEach(() => {
+    resetClock();
+  });
+
   test("records checkin on button tap", async () => {
+    fixedNow("2026-05-26T22:00:00Z");
+
     const { db } = createTestDb();
     const apiCalls: string[] = [];
 
@@ -54,9 +61,10 @@ describe("checkin callback handler", () => {
       .insert(chats)
       .values({ telegramChatId: "-100999", title: "Test Group" })
       .returning();
+    if (!chat) throw new Error("expected chat row");
 
     await db.insert(dailyWindows).values({
-      chatId: chat!.id,
+      chatId: chat.id,
       checkinDate: "2026-05-26",
       windowOpensAt: "2026-05-26T21:00:00Z",
       windowClosesAt: "2026-05-27T23:00:00Z",

@@ -1,7 +1,9 @@
 import { DateTime, Settings } from "luxon";
 
 export function fixedNow(iso: string): () => DateTime {
-  Settings.now = () => DateTime.fromISO(iso, { zone: "utc" }).toMillis();
+  const millis = Date.parse(iso);
+  if (Number.isNaN(millis)) throw new Error(`invalid ISO date: ${iso}`);
+  Settings.now = () => millis;
   return () => DateTime.utc();
 }
 

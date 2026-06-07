@@ -18,16 +18,18 @@ describe("members and checkins", () => {
       .insert(chats)
       .values({ telegramChatId: "-1001", title: "G" })
       .returning();
+    if (!chat) throw new Error("expected chat row");
+
     const { memberId } = await ensureMember(db, {
       id: 42,
       username: "alice",
       first_name: "Alice",
     });
-    await joinChatMember(db, chat!.id, memberId);
-    expect(await countJoinedMembers(db, chat!.id)).toBe(1);
+    await joinChatMember(db, chat.id, memberId);
+    expect(await countJoinedMembers(db, chat.id)).toBe(1);
 
-    await leaveChatMember(db, chat!.id, memberId);
-    expect(await countJoinedMembers(db, chat!.id)).toBe(0);
+    await leaveChatMember(db, chat.id, memberId);
+    expect(await countJoinedMembers(db, chat.id)).toBe(0);
   });
 
   test("recordCheckin upserts answer", async () => {
@@ -40,13 +42,15 @@ describe("members and checkins", () => {
       .insert(chats)
       .values({ telegramChatId: "-1002", title: "G" })
       .returning();
+    if (!chat) throw new Error("expected chat row");
+
     const { memberId } = await ensureMember(db, { id: 99, first_name: "Bob" });
-    await joinChatMember(db, chat!.id, memberId);
+    await joinChatMember(db, chat.id, memberId);
 
     const [window] = await db
       .insert(dailyWindows)
       .values({
-        chatId: chat!.id,
+        chatId: chat.id,
         checkinDate: "2026-05-26",
         windowOpensAt: "2026-05-26T21:00:00Z",
         windowClosesAt: "2026-05-26T23:00:00Z",
@@ -54,12 +58,13 @@ describe("members and checkins", () => {
         status: "open",
       })
       .returning();
+    if (!window) throw new Error("expected window row");
 
     await recordCheckin({
       db,
       api: api as never,
-      chat: chat!,
-      window: window!,
+      chat,
+      window,
       memberId,
       presetKey: "yes",
     });
@@ -71,8 +76,8 @@ describe("members and checkins", () => {
     await recordCheckin({
       db,
       api: api as never,
-      chat: chat!,
-      window: window!,
+      chat,
+      window,
       memberId,
       presetKey: "no",
     });

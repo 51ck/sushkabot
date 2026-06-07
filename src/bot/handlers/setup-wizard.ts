@@ -7,7 +7,6 @@ import { texts } from "../../texts.ts";
 import { DEFAULT_QUESTION, type ResponseMode } from "../../types.ts";
 import type { BotContext } from "../context.ts";
 import { isGroupChat, requireGroupAdmin } from "../context.ts";
-import { safeEditMessageText } from "../safe-edit.ts";
 import {
   buildDurationKeyboard,
   buildLabelsKeyboard,
@@ -23,6 +22,7 @@ import {
   SETTINGS_PREFIX,
   type WizardScreen,
 } from "../keyboards/settings-wizard.ts";
+import { safeEditMessageText } from "../safe-edit.ts";
 
 export interface WizardDraft {
   checkinHour: number;

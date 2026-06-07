@@ -1,4 +1,4 @@
-import { GrammyError, type Api, type InlineKeyboard } from "grammy";
+import { type Api, GrammyError, type InlineKeyboard } from "grammy";
 
 /** Ignores Telegram 400 "message is not modified" when content/markup unchanged. */
 export async function safeEditMessageText(
