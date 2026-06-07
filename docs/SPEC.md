@@ -511,6 +511,7 @@ Deploy user must be in `docker` group (one-time `usermod` as root). GitHub Actio
 | Secret | Purpose |
 |--------|---------|
 | `VPS_HOST` | Server address |
+| `VPS_PORT` | SSH port — optional, default `22` (Actions → VPS only) |
 | `VPS_USER` | SSH user (non-root deploy user) |
 | `VPS_SSH_KEY` | Private key |
 | `VPS_INSTALL_DIR` | Optional — default `~/sushkabot` |

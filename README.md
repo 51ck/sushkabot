@@ -81,7 +81,7 @@ Run as the **deploy user** (not root). One-time root task only: add user to `doc
 From your laptop, copy bootstrap scripts to the VPS:
 
 ```bash
-scp -r deploy VPS_USER@VPS_HOST:~/sushkabot-bootstrap/
+scp -P YOUR_SSH_PORT -r deploy VPS_USER@VPS_HOST:~/sushkabot-bootstrap/
 ```
 
 On the VPS:
@@ -107,6 +107,7 @@ Edit `~/sushkabot/.env` (or your `INSTALL_DIR`):
 | Secret | Required | Purpose |
 |--------|----------|---------|
 | `VPS_HOST` | yes | Server IP or hostname |
+| `VPS_PORT` | if not 22 | SSH port (Actions → VPS only) |
 | `VPS_USER` | yes | SSH user (non-root deploy user) |
 | `VPS_SSH_KEY` | yes | Private SSH key |
 | `VPS_INSTALL_DIR` | no | Default `~/sushkabot` — set if bootstrap used another path |

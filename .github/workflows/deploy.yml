@@ -68,6 +68,11 @@ jobs:
         run: |
           echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          if [ -n "${{ secrets.VPS_PORT }}" ]; then
+            echo "port=${{ secrets.VPS_PORT }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "port=22" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.0
@@ -81,6 +86,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ steps.vars.outputs.port }}
           envs: IMAGE_TAG,GHCR_IMAGE,GHCR_READ_TOKEN,GHCR_USER,VPS_INSTALL_DIR
           script_stop: true
           script: |
