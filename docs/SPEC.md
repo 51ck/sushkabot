@@ -412,7 +412,7 @@ tests/                          unit, integration, handler fixtures
 | `DEBOUNCE_MS` | no | `2000` | Message edit debounce interval |
 
 **Development:** `.env.development` + test bot + private test group.  
-**Production:** VPS `/opt/sushkobot/.env`, Docker Compose, DB volume at `./data`.
+**Production:** VPS `~/sushkobot/.env` (deploy user, no sudo), Docker Compose, DB volume at `./data`.
 
 ---
 
@@ -485,7 +485,7 @@ flowchart LR
 ### 14.2 VPS layout
 
 ```
-/opt/sushkobot/
+~/sushkobot/             # VPS_INSTALL_DIR — owned by deploy user
 ├── .env                 # BOT_TOKEN, ADMIN_USER_IDS, GHCR_IMAGE, IMAGE_TAG, DATABASE_PATH
 ├── data/                # SQLite volume mount → /app/data in container
 ├── backups/
@@ -497,26 +497,27 @@ Compose ([`docker-compose.yml`](../docker-compose.yml)):
 - `image: ${GHCR_IMAGE}:${IMAGE_TAG}` — no `build:` on server
 - `env_file: ../.env`
 - `volumes: ../data:/app/data`
-- Run with: `docker compose --env-file /opt/sushkobot/.env ...`
+- Run with: `docker compose --env-file ~/sushkobot/.env ...`
 
-One-time bootstrap: [`deploy/bootstrap-vps.sh`](../deploy/bootstrap-vps.sh)
+One-time bootstrap (as deploy user, no sudo): [`deploy/bootstrap-vps.sh`](../deploy/bootstrap-vps.sh). Deploy user must be in `docker` group (one-time `usermod` as root).
 
 ### 14.3 GitHub secrets
 
 | Secret | Purpose |
 |--------|---------|
 | `VPS_HOST` | Server address |
-| `VPS_USER` | SSH user |
+| `VPS_USER` | SSH user (non-root deploy user) |
 | `VPS_SSH_KEY` | Private key |
-| `GHCR_READ_TOKEN` | Optional — PAT with `read:packages` if GHCR package is private |
+| `VPS_INSTALL_DIR` | Optional — default `~/sushkobot` |
+| `GHCR_READ_TOKEN` | Optional — classic PAT with `read:packages` if GHCR package is private |
 
 `GITHUB_TOKEN` pushes images during `build-push` (no extra secret for push).
 
 ### 14.4 Rollback and backups
 
-**Rollback:** set `IMAGE_TAG=sha-<older>` in `/opt/sushkobot/.env`, then `docker compose --env-file ... pull && up -d`.
+**Rollback:** set `IMAGE_TAG=sha-<older>` in `~/sushkobot/.env`, then `docker compose --env-file ... pull && up -d`.
 
-**Backup:** copy `/opt/sushkobot/data/sushkobot.db` to `backups/` (daily cron recommended).
+**Backup:** copy `~/sushkobot/data/sushkobot.db` to `backups/` (daily cron recommended).
 
 **Restore:** stop container, replace DB file, start container. Scheduler rehydrates from `daily_windows`.
 

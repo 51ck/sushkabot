@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 # One-time VPS bootstrap for sushkobot (Docker Compose + GHCR pull deploy).
+# Run as the deploy user — no sudo required.
 set -euo pipefail
 
-INSTALL_DIR="${INSTALL_DIR:-/opt/sushkobot}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/sushkobot}"
 REPO_URL="${REPO_URL:-}"
 
+if [ "$(id -u)" -eq 0 ]; then
+  echo "Do not run as root. Run as your deploy user (no sudo)."
+  exit 1
+fi
+
 if [ -z "$REPO_URL" ]; then
-  echo "Usage: REPO_URL=https://github.com/you/sushkobot.git sudo -E ./deploy/bootstrap-vps.sh"
+  echo "Usage: REPO_URL=https://github.com/you/sushkobot.git ./deploy/bootstrap-vps.sh"
   exit 1
 fi
 
@@ -18,6 +24,13 @@ fi
 
 if ! docker compose version >/dev/null 2>&1; then
   echo "docker compose plugin not found."
+  exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+  echo "Cannot access Docker as $(whoami)."
+  echo "One-time (as root on VPS): usermod -aG docker $(whoami)"
+  echo "Then log out and SSH back in."
   exit 1
 fi
 
@@ -50,12 +63,14 @@ chmod 600 "$ENV_FILE"
 
 echo ""
 echo "Bootstrap done."
+echo "Install dir: $INSTALL_DIR"
 echo ""
 echo "Next steps:"
 echo "  1. Edit $ENV_FILE (BOT_TOKEN, ADMIN_USER_IDS, GHCR_IMAGE)"
 echo "  2. Set GitHub secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY"
-echo "  3. If GHCR package is private, add GHCR_READ_TOKEN (PAT with read:packages)"
-echo "  4. Push to master — GitHub Actions builds image and deploys"
+echo "  3. Optional: VPS_INSTALL_DIR=$INSTALL_DIR if not using ~/sushkobot"
+echo "  4. If GHCR package is private, add GHCR_READ_TOKEN (classic PAT, read:packages)"
+echo "  5. Push to master — GitHub Actions builds image and deploys"
 echo ""
 echo "Manual first pull (optional, after image exists in GHCR):"
 echo "  cd $INSTALL_DIR/app"

@@ -76,18 +76,20 @@ jobs:
           GHCR_IMAGE: ${{ steps.vars.outputs.image }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
           GHCR_USER: ${{ github.repository_owner }}
+          VPS_INSTALL_DIR: ${{ secrets.VPS_INSTALL_DIR }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: IMAGE_TAG,GHCR_IMAGE,GHCR_READ_TOKEN,GHCR_USER
+          envs: IMAGE_TAG,GHCR_IMAGE,GHCR_READ_TOKEN,GHCR_USER,VPS_INSTALL_DIR
           script_stop: true
           script: |
             set -euo pipefail
-            cd /opt/sushkobot/app
+            INSTALL_DIR="${VPS_INSTALL_DIR:-$HOME/sushkobot}"
+            cd "$INSTALL_DIR/app"
             git pull origin master
 
-            ENV_FILE=/opt/sushkobot/.env
+            ENV_FILE="$INSTALL_DIR/.env"
             touch "$ENV_FILE"
             if grep -q '^IMAGE_TAG=' "$ENV_FILE"; then
               sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" "$ENV_FILE"

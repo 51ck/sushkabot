@@ -60,7 +60,7 @@ Images are built in GitHub Actions and pushed to **GHCR**. The VPS only pulls an
 ### VPS layout
 
 ```
-/opt/sushkobot/
+~/sushkobot/          # or VPS_INSTALL_DIR — owned by deploy user, no sudo
 ├── .env          # secrets + GHCR_IMAGE + IMAGE_TAG
 ├── data/         # SQLite (persisted)
 ├── backups/
@@ -69,13 +69,16 @@ Images are built in GitHub Actions and pushed to **GHCR**. The VPS only pulls an
 
 ### One-time server setup
 
+Run as the **deploy user** (not root). One-time root task only: add user to `docker` group (`usermod -aG docker deploy`).
+
 ```bash
 # On VPS (Docker Engine + Compose plugin required)
-REPO_URL=https://github.com/YOU/sushkobot.git sudo -E ./deploy/bootstrap-vps.sh
-# Or clone first, then run bootstrap from repo root
+git clone https://github.com/YOU/sushkobot.git /tmp/sushkobot
+cd /tmp/sushkobot
+REPO_URL=https://github.com/YOU/sushkobot.git ./deploy/bootstrap-vps.sh
 ```
 
-Edit `/opt/sushkobot/.env`:
+Edit `~/sushkobot/.env` (or your `INSTALL_DIR`):
 
 - `BOT_TOKEN`, `ADMIN_USER_IDS`
 - `GHCR_IMAGE=ghcr.io/your-github-user/sushkobot` (lowercase)
@@ -86,9 +89,10 @@ Edit `/opt/sushkobot/.env`:
 | Secret | Required | Purpose |
 |--------|----------|---------|
 | `VPS_HOST` | yes | Server IP or hostname |
-| `VPS_USER` | yes | SSH user |
+| `VPS_USER` | yes | SSH user (non-root deploy user) |
 | `VPS_SSH_KEY` | yes | Private SSH key |
-| `GHCR_READ_TOKEN` | if private package | PAT with `read:packages` for `docker pull` |
+| `VPS_INSTALL_DIR` | no | Default `~/sushkobot` — set if bootstrap used another path |
+| `GHCR_READ_TOKEN` | if private package | Classic PAT with `read:packages` for `docker pull` |
 
 Add the matching public key to `~/.ssh/authorized_keys` on the VPS.
 
@@ -105,26 +109,26 @@ PRs run CI only (`.github/workflows/ci.yml`).
 ### Manual operations on VPS
 
 ```bash
-cd /opt/sushkobot/app
-docker compose --env-file /opt/sushkobot/.env pull
-docker compose --env-file /opt/sushkobot/.env up -d
-docker compose --env-file /opt/sushkobot/.env logs -f bot
+cd ~/sushkobot/app
+docker compose --env-file ~/sushkobot/.env pull
+docker compose --env-file ~/sushkobot/.env up -d
+docker compose --env-file ~/sushkobot/.env logs -f bot
 ```
 
 ### Rollback
 
-Set an older tag in `/opt/sushkobot/.env`:
+Set an older tag in `~/sushkobot/.env`:
 
 ```bash
 IMAGE_TAG=sha-abc1234   # previous deploy tag from GHCR
 ```
 
-Then `docker compose --env-file /opt/sushkobot/.env pull && up -d`.
+Then `docker compose --env-file ~/sushkobot/.env pull && up -d`.
 
 ### Backups
 
 ```bash
-cp /opt/sushkobot/data/sushkobot.db /opt/sushkobot/backups/sushkobot-$(date +%F).db
+cp ~/sushkobot/data/sushkobot.db ~/sushkobot/backups/sushkobot-$(date +%F).db
 ```
 
 Restore: stop container, replace `.db` file, start container.
