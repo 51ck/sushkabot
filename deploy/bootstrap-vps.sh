@@ -23,11 +23,20 @@ fi
 
 mkdir -p "$INSTALL_DIR/data" "$INSTALL_DIR/backups"
 
-if [ ! -d "$INSTALL_DIR/app/.git" ]; then
-  git clone "$REPO_URL" "$INSTALL_DIR/app"
+APP_DIR="$INSTALL_DIR/app"
+
+if [ ! -d "$APP_DIR/.git" ]; then
+  git clone "$REPO_URL" "$APP_DIR"
 else
-  echo "Repo already cloned at $INSTALL_DIR/app"
+  echo "Repo already cloned at $APP_DIR — syncing origin remote"
 fi
+
+if git -C "$APP_DIR" remote | grep -qx origin; then
+  git -C "$APP_DIR" remote set-url origin "$REPO_URL"
+else
+  git -C "$APP_DIR" remote add origin "$REPO_URL"
+fi
+echo "Git remote origin: $(git -C "$APP_DIR" remote get-url origin)"
 
 ENV_FILE="$INSTALL_DIR/.env"
 if [ ! -f "$ENV_FILE" ]; then
