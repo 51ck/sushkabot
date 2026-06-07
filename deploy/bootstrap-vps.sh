@@ -4,28 +4,17 @@
 set -euo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-$HOME/sushkabot}"
-REPO_URL="${REPO_URL:-}"
+GITHUB_REPO="${GITHUB_REPO:-51ck/sushkabot}"
+SSH_HOST="${SSH_HOST:-github-sushkabot}"
+REPO_URL="${REPO_URL:-git@${SSH_HOST}:${GITHUB_REPO}.git}"
 
 if [ "$(id -u)" -eq 0 ]; then
   echo "Do not run as root. Run as your deploy user (no sudo)."
   exit 1
 fi
 
-if [ -z "$REPO_URL" ]; then
-  echo "Usage:"
-  echo "  REPO_URL=git@github-sushkabot:you/sushkabot.git ./deploy/bootstrap-vps.sh"
-  echo ""
-  echo "Set up the deploy key first: ./deploy/setup-repo-ssh.sh"
-  exit 1
-fi
-
-if [[ "$REPO_URL" == git@* ]]; then
-  if ! GIT_SSH_COMMAND="ssh -o BatchMode=yes" git ls-remote "$REPO_URL" HEAD >/dev/null 2>&1; then
-    echo "Cannot reach $REPO_URL via SSH."
-    echo "Run ./deploy/setup-repo-ssh.sh, add the deploy key on GitHub, then retry."
-    exit 1
-  fi
-fi
+echo "Cloning via SSH: $REPO_URL"
+echo "(Run ./deploy/setup-repo-ssh.sh first if you have not added the deploy key.)"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker not found. Install Docker Engine + Compose plugin first:"
@@ -50,7 +39,7 @@ mkdir -p "$INSTALL_DIR/data" "$INSTALL_DIR/backups"
 APP_DIR="$INSTALL_DIR/app"
 
 if [ ! -d "$APP_DIR/.git" ]; then
-  git clone "$REPO_URL" "$APP_DIR"
+  GIT_SSH_COMMAND="ssh -o BatchMode=yes" git clone "$REPO_URL" "$APP_DIR"
 else
   echo "Repo already cloned at $APP_DIR — syncing origin remote"
 fi
