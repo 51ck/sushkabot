@@ -15,7 +15,7 @@ export const env = createEnv({
           .map((id) => Number.parseInt(id, 10)),
       )
       .pipe(z.array(z.number().int().positive())),
-    DATABASE_PATH: z.string().default("./data/sushkobot.db"),
+    DATABASE_PATH: z.string().default("./data/sushkabot.db"),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   },
   runtimeEnv: process.env,

@@ -1,4 +1,4 @@
-# Sushkobot — Product & Technical Specification
+# Sushkabot — Product & Technical Specification
 
 **Version:** 0.3.0  
 **Status:** Living document — reflects implemented behavior in `src/` as of June 2026  
@@ -16,7 +16,7 @@
 
 ## 1. Purpose
 
-Sushkobot is a **Telegram group bot** for **evening sobriety check-ins**. It:
+Sushkabot is a **Telegram group bot** for **evening sobriety check-ins**. It:
 
 1. Posts a **daily reminder** in the group with **inline buttons**
 2. Accepts answers during a **configurable time window**
@@ -407,12 +407,12 @@ tests/                          unit, integration, handler fixtures
 | `BOT_TOKEN` | yes | — | Telegram bot token |
 | `ADMIN_USER_IDS` | yes | — | Comma-separated Telegram user IDs |
 | `BOT_ENV` | no | `production` | `development` enables force commands |
-| `DATABASE_PATH` | no | `./data/sushkobot.db` | SQLite file path |
+| `DATABASE_PATH` | no | `./data/sushkabot.db` | SQLite file path |
 | `LOG_LEVEL` | no | `info` | `debug`, `info`, `warn`, `error` |
 | `DEBOUNCE_MS` | no | `2000` | Message edit debounce interval |
 
 **Development:** `.env.development` + test bot + private test group.  
-**Production:** VPS `~/sushkobot/.env` (deploy user, no sudo), Docker Compose, DB volume at `./data`.
+**Production:** VPS `~/sushkabot/.env` (deploy user, no sudo), Docker Compose, DB volume at `./data`.
 
 ---
 
@@ -480,12 +480,12 @@ flowchart LR
 | [`ci.yml`](../.github/workflows/ci.yml) | PR | lint, typecheck, test |
 | [`deploy.yml`](../.github/workflows/deploy.yml) | push `master` | test → build-push → deploy |
 
-**GHCR tags:** `ghcr.io/<owner>/sushkobot:latest` and `:sha-<7-char-commit>`
+**GHCR tags:** `ghcr.io/<owner>/sushkabot:latest` and `:sha-<7-char-commit>`
 
 ### 14.2 VPS layout
 
 ```
-~/sushkobot/             # VPS_INSTALL_DIR — owned by deploy user
+~/sushkabot/             # VPS_INSTALL_DIR — owned by deploy user
 ├── .env                 # BOT_TOKEN, ADMIN_USER_IDS, GHCR_IMAGE, IMAGE_TAG, DATABASE_PATH
 ├── data/                # SQLite volume mount → /app/data in container
 ├── backups/
@@ -497,9 +497,14 @@ Compose ([`docker-compose.yml`](../docker-compose.yml)):
 - `image: ${GHCR_IMAGE}:${IMAGE_TAG}` — no `build:` on server
 - `env_file: ../.env`
 - `volumes: ../data:/app/data`
-- Run with: `docker compose --env-file ~/sushkobot/.env ...`
+- Run with: `docker compose --env-file ~/sushkabot/.env ...`
 
-One-time bootstrap (as deploy user, no sudo): [`deploy/bootstrap-vps.sh`](../deploy/bootstrap-vps.sh). Deploy user must be in `docker` group (one-time `usermod` as root).
+One-time bootstrap (as deploy user, no sudo):
+
+1. [`deploy/setup-repo-ssh.sh`](../deploy/setup-repo-ssh.sh) — RSA deploy key + `Host github-sushkabot` in `~/.ssh/config`; add public key as repo **Deploy key** (read-only).
+2. [`deploy/bootstrap-vps.sh`](../deploy/bootstrap-vps.sh) — clone via `git@github-sushkabot:owner/sushkabot.git`.
+
+Deploy user must be in `docker` group (one-time `usermod` as root). GitHub Actions uses a separate `VPS_SSH_KEY` to SSH into the VPS.
 
 ### 14.3 GitHub secrets
 
@@ -508,16 +513,16 @@ One-time bootstrap (as deploy user, no sudo): [`deploy/bootstrap-vps.sh`](../dep
 | `VPS_HOST` | Server address |
 | `VPS_USER` | SSH user (non-root deploy user) |
 | `VPS_SSH_KEY` | Private key |
-| `VPS_INSTALL_DIR` | Optional — default `~/sushkobot` |
+| `VPS_INSTALL_DIR` | Optional — default `~/sushkabot` |
 | `GHCR_READ_TOKEN` | Optional — classic PAT with `read:packages` if GHCR package is private |
 
 `GITHUB_TOKEN` pushes images during `build-push` (no extra secret for push).
 
 ### 14.4 Rollback and backups
 
-**Rollback:** set `IMAGE_TAG=sha-<older>` in `~/sushkobot/.env`, then `docker compose --env-file ... pull && up -d`.
+**Rollback:** set `IMAGE_TAG=sha-<older>` in `~/sushkabot/.env`, then `docker compose --env-file ... pull && up -d`.
 
-**Backup:** copy `~/sushkobot/data/sushkobot.db` to `backups/` (daily cron recommended).
+**Backup:** copy `~/sushkabot/data/sushkabot.db` to `backups/` (daily cron recommended).
 
 **Restore:** stop container, replace DB file, start container. Scheduler rehydrates from `daily_windows`.
 

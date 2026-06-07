@@ -1,6 +1,6 @@
 services:
   bot:
-    image: ${GHCR_IMAGE:-ghcr.io/example/sushkobot}:${IMAGE_TAG:-latest}
+    image: ${GHCR_IMAGE:-ghcr.io/example/sushkabot}:${IMAGE_TAG:-latest}
     pull_policy: always
     restart: unless-stopped
     env_file: ../.env

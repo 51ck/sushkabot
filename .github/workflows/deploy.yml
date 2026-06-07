@@ -85,7 +85,7 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-            INSTALL_DIR="${VPS_INSTALL_DIR:-$HOME/sushkobot}"
+            INSTALL_DIR="${VPS_INSTALL_DIR:-$HOME/sushkabot}"
             cd "$INSTALL_DIR/app"
             git pull origin master
 

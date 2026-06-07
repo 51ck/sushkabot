@@ -30,7 +30,7 @@ async function main() {
     });
   }
 
-  console.info(`Sushkobot starting (${env.BOT_ENV})`);
+  console.info(`Sushkabot starting (${env.BOT_ENV})`);
   await bot.start({
     onStart: async (info) => {
       console.info(`Logged in as @${info.username}`);

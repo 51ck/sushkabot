@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# One-time VPS bootstrap for sushkobot (Docker Compose + GHCR pull deploy).
+# One-time VPS bootstrap for sushkabot (Docker Compose + GHCR pull deploy).
 # Run as the deploy user — no sudo required.
 set -euo pipefail
 
-INSTALL_DIR="${INSTALL_DIR:-$HOME/sushkobot}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/sushkabot}"
 REPO_URL="${REPO_URL:-}"
 
 if [ "$(id -u)" -eq 0 ]; then
@@ -12,8 +12,19 @@ if [ "$(id -u)" -eq 0 ]; then
 fi
 
 if [ -z "$REPO_URL" ]; then
-  echo "Usage: REPO_URL=https://github.com/you/sushkobot.git ./deploy/bootstrap-vps.sh"
+  echo "Usage:"
+  echo "  REPO_URL=git@github-sushkabot:you/sushkabot.git ./deploy/bootstrap-vps.sh"
+  echo ""
+  echo "Set up the deploy key first: ./deploy/setup-repo-ssh.sh"
   exit 1
+fi
+
+if [[ "$REPO_URL" == git@* ]]; then
+  if ! GIT_SSH_COMMAND="ssh -o BatchMode=yes" git ls-remote "$REPO_URL" HEAD >/dev/null 2>&1; then
+    echo "Cannot reach $REPO_URL via SSH."
+    echo "Run ./deploy/setup-repo-ssh.sh, add the deploy key on GitHub, then retry."
+    exit 1
+  fi
 fi
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -67,8 +78,8 @@ echo "Install dir: $INSTALL_DIR"
 echo ""
 echo "Next steps:"
 echo "  1. Edit $ENV_FILE (BOT_TOKEN, ADMIN_USER_IDS, GHCR_IMAGE)"
-echo "  2. Set GitHub secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY"
-echo "  3. Optional: VPS_INSTALL_DIR=$INSTALL_DIR if not using ~/sushkobot"
+echo "  2. Set GitHub Actions secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY (Actions → VPS, not repo deploy key)"
+echo "  3. Optional: VPS_INSTALL_DIR=$INSTALL_DIR if not using ~/sushkabot"
 echo "  4. If GHCR package is private, add GHCR_READ_TOKEN (classic PAT, read:packages)"
 echo "  5. Push to master — GitHub Actions builds image and deploys"
 echo ""
@@ -78,4 +89,4 @@ echo "  docker compose --env-file $ENV_FILE pull"
 echo "  docker compose --env-file $ENV_FILE up -d"
 echo ""
 echo "Optional daily backup cron:"
-echo "  0 3 * * * cp $INSTALL_DIR/data/sushkobot.db $INSTALL_DIR/backups/sushkobot-\$(date +\\%F).db"
+echo "  0 3 * * * cp $INSTALL_DIR/data/sushkabot.db $INSTALL_DIR/backups/sushkabot-\$(date +\\%F).db"

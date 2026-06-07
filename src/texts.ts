@@ -1,5 +1,5 @@
 export const texts = {
-  help: `Sushkobot — sobriety check-in bot
+  help: `Sushkabot — sobriety check-in bot
 
 Group commands:
 /setup — configure this chat with buttons (admin)

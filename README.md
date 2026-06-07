@@ -1,4 +1,4 @@
-# Sushkobot
+# Sushkabot
 
 Telegram bot for group sobriety check-ins: evening reminders with inline buttons, deadline windows, live progress on the check-in message, and daily summaries with streaks.
 
@@ -60,7 +60,7 @@ Images are built in GitHub Actions and pushed to **GHCR**. The VPS only pulls an
 ### VPS layout
 
 ```
-~/sushkobot/          # or VPS_INSTALL_DIR — owned by deploy user, no sudo
+~/sushkabot/          # or VPS_INSTALL_DIR — owned by deploy user, no sudo
 ├── .env          # secrets + GHCR_IMAGE + IMAGE_TAG
 ├── data/         # SQLite (persisted)
 ├── backups/
@@ -71,18 +71,36 @@ Images are built in GitHub Actions and pushed to **GHCR**. The VPS only pulls an
 
 Run as the **deploy user** (not root). One-time root task only: add user to `docker` group (`usermod -aG docker deploy`).
 
+**Two SSH keys** (different jobs):
+
+| Key | Where | Purpose |
+|-----|--------|---------|
+| Repo deploy key (RSA) | VPS `~/.ssh/sushkabot_repo_rsa` | `git clone` / `git pull` on VPS |
+| Actions deploy key | GitHub secret `VPS_SSH_KEY` | GitHub Actions SSH into VPS |
+
+From your laptop, copy bootstrap scripts to the VPS:
+
 ```bash
-# On VPS (Docker Engine + Compose plugin required)
-git clone https://github.com/YOU/sushkobot.git /tmp/sushkobot
-cd /tmp/sushkobot
-REPO_URL=https://github.com/YOU/sushkobot.git ./deploy/bootstrap-vps.sh
+scp -r deploy VPS_USER@VPS_HOST:~/sushkabot-bootstrap/
 ```
 
-Edit `~/sushkobot/.env` (or your `INSTALL_DIR`):
+On the VPS:
+
+```bash
+cd ~/sushkabot-bootstrap
+chmod +x setup-repo-ssh.sh bootstrap-vps.sh
+./setup-repo-ssh.sh
+# Paste the printed public key → GitHub repo → Settings → Deploy keys (read-only)
+
+ssh -T git@github-sushkabot
+REPO_URL=git@github-sushkabot:YOU/sushkabot.git ./bootstrap-vps.sh
+```
+
+Edit `~/sushkabot/.env` (or your `INSTALL_DIR`):
 
 - `BOT_TOKEN`, `ADMIN_USER_IDS`
-- `GHCR_IMAGE=ghcr.io/your-github-user/sushkobot` (lowercase)
-- `DATABASE_PATH=/app/data/sushkobot.db`
+- `GHCR_IMAGE=ghcr.io/your-github-user/sushkabot` (lowercase)
+- `DATABASE_PATH=/app/data/sushkabot.db`
 
 ### GitHub secrets
 
@@ -91,17 +109,17 @@ Edit `~/sushkobot/.env` (or your `INSTALL_DIR`):
 | `VPS_HOST` | yes | Server IP or hostname |
 | `VPS_USER` | yes | SSH user (non-root deploy user) |
 | `VPS_SSH_KEY` | yes | Private SSH key |
-| `VPS_INSTALL_DIR` | no | Default `~/sushkobot` — set if bootstrap used another path |
+| `VPS_INSTALL_DIR` | no | Default `~/sushkabot` — set if bootstrap used another path |
 | `GHCR_READ_TOKEN` | if private package | Classic PAT with `read:packages` for `docker pull` |
 
-Add the matching public key to `~/.ssh/authorized_keys` on the VPS.
+Add the **Actions** public key to `~/.ssh/authorized_keys` on the VPS (not the repo deploy key).
 
 ### Deploy flow
 
 On every push to `master`:
 
 1. **test** — lint, typecheck, `bun test`
-2. **build-push** — Docker image → `ghcr.io/<owner>/sushkobot:latest` and `:sha-<commit>`
+2. **build-push** — Docker image → `ghcr.io/<owner>/sushkabot:latest` and `:sha-<commit>`
 3. **deploy** — SSH: `git pull`, update `IMAGE_TAG` in `.env`, `docker compose pull && up -d`
 
 PRs run CI only (`.github/workflows/ci.yml`).
@@ -109,26 +127,26 @@ PRs run CI only (`.github/workflows/ci.yml`).
 ### Manual operations on VPS
 
 ```bash
-cd ~/sushkobot/app
-docker compose --env-file ~/sushkobot/.env pull
-docker compose --env-file ~/sushkobot/.env up -d
-docker compose --env-file ~/sushkobot/.env logs -f bot
+cd ~/sushkabot/app
+docker compose --env-file ~/sushkabot/.env pull
+docker compose --env-file ~/sushkabot/.env up -d
+docker compose --env-file ~/sushkabot/.env logs -f bot
 ```
 
 ### Rollback
 
-Set an older tag in `~/sushkobot/.env`:
+Set an older tag in `~/sushkabot/.env`:
 
 ```bash
 IMAGE_TAG=sha-abc1234   # previous deploy tag from GHCR
 ```
 
-Then `docker compose --env-file ~/sushkobot/.env pull && up -d`.
+Then `docker compose --env-file ~/sushkabot/.env pull && up -d`.
 
 ### Backups
 
 ```bash
-cp ~/sushkobot/data/sushkobot.db ~/sushkobot/backups/sushkobot-$(date +%F).db
+cp ~/sushkabot/data/sushkabot.db ~/sushkabot/backups/sushkabot-$(date +%F).db
 ```
 
 Restore: stop container, replace `.db` file, start container.
@@ -148,7 +166,7 @@ Command menu (`/join`, `/setup`, etc.) is registered automatically via `setMyCom
 | `BOT_ENV` | `development` or `production` |
 | `BOT_TOKEN` | Telegram bot token |
 | `ADMIN_USER_IDS` | Comma-separated Telegram user IDs |
-| `DATABASE_PATH` | SQLite file path (production: `/app/data/sushkobot.db`) |
+| `DATABASE_PATH` | SQLite file path (production: `/app/data/sushkabot.db`) |
 | `LOG_LEVEL` | `debug`, `info`, `warn`, `error` |
-| `GHCR_IMAGE` | Production only — e.g. `ghcr.io/user/sushkobot` |
+| `GHCR_IMAGE` | Production only — e.g. `ghcr.io/user/sushkabot` |
 | `IMAGE_TAG` | Production only — `latest` or `sha-<commit>` (set by deploy) |

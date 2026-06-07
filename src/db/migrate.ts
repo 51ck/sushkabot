@@ -47,7 +47,7 @@ export function runMigrations(sqlite: Database, migrationsDir = "./drizzle") {
 
 if (import.meta.main) {
   const { createDatabase } = await import("./client.ts");
-  const path = process.env.DATABASE_PATH ?? "./data/sushkobot.db";
+  const path = process.env.DATABASE_PATH ?? "./data/sushkabot.db";
   const { sqlite } = createDatabase(path);
   runMigrations(sqlite);
   console.info("Migrations complete");
