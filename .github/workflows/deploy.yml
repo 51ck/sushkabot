@@ -1,0 +1,109 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.2.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: bun test
+
+  build-push:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image variables
+        run: |
+          echo "IMAGE=${{ env.REGISTRY }}/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+          echo "TAG=sha-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ env.TAG }}
+
+  deploy:
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set deploy variables
+        id: vars
+        run: |
+          echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE_TAG: ${{ steps.vars.outputs.tag }}
+          GHCR_IMAGE: ${{ steps.vars.outputs.image }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          GHCR_USER: ${{ github.repository_owner }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: IMAGE_TAG,GHCR_IMAGE,GHCR_READ_TOKEN,GHCR_USER
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/sushkobot/app
+            git pull origin main
+
+            ENV_FILE=/opt/sushkobot/.env
+            touch "$ENV_FILE"
+            if grep -q '^IMAGE_TAG=' "$ENV_FILE"; then
+              sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" "$ENV_FILE"
+            else
+              echo "IMAGE_TAG=${IMAGE_TAG}" >> "$ENV_FILE"
+            fi
+            if grep -q '^GHCR_IMAGE=' "$ENV_FILE"; then
+              sed -i "s|^GHCR_IMAGE=.*|GHCR_IMAGE=${GHCR_IMAGE}|" "$ENV_FILE"
+            else
+              echo "GHCR_IMAGE=${GHCR_IMAGE}" >> "$ENV_FILE"
+            fi
+
+            if [ -n "${GHCR_READ_TOKEN:-}" ]; then
+              echo "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            fi
+
+            docker compose --env-file "$ENV_FILE" pull
+            docker compose --env-file "$ENV_FILE" up -d
+            docker image prune -f
