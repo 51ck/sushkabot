@@ -3,9 +3,10 @@ services:
     image: ${GHCR_IMAGE:-ghcr.io/example/sushkabot}:${IMAGE_TAG:-latest}
     pull_policy: always
     restart: unless-stopped
-    env_file: ../.env
+    env_file:
+      - ${ENV_FILE}
     volumes:
-      - ../data:/app/data
+      - ${DATA_DIR}:/app/data
     logging:
       driver: json-file
       options:

@@ -128,10 +128,12 @@ PRs run CI only (`.github/workflows/ci.yml`).
 ### Manual operations on VPS
 
 ```bash
+export ENV_FILE=~/sushkabot/.env
+export DATA_DIR=~/sushkabot/data
 cd ~/sushkabot/app
-docker compose --env-file ~/sushkabot/.env pull
-docker compose --env-file ~/sushkabot/.env up -d
-docker compose --env-file ~/sushkabot/.env logs -f bot
+docker compose --env-file "$ENV_FILE" pull
+docker compose --env-file "$ENV_FILE" up -d
+docker compose --env-file "$ENV_FILE" logs -f bot
 ```
 
 ### Rollback

@@ -92,10 +92,16 @@ jobs:
           script: |
             set -euo pipefail
             INSTALL_DIR="${VPS_INSTALL_DIR:-$HOME/sushkabot}"
+            if [ -z "$INSTALL_DIR" ]; then
+              INSTALL_DIR="$HOME/sushkabot"
+            fi
             cd "$INSTALL_DIR/app"
             git pull origin master
 
             ENV_FILE="$INSTALL_DIR/.env"
+            DATA_DIR="$INSTALL_DIR/data"
+            export ENV_FILE DATA_DIR
+            mkdir -p "$DATA_DIR"
             touch "$ENV_FILE"
             if grep -q '^IMAGE_TAG=' "$ENV_FILE"; then
               sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" "$ENV_FILE"

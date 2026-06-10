@@ -495,9 +495,9 @@ flowchart LR
 Compose ([`docker-compose.yml`](../docker-compose.yml)):
 
 - `image: ${GHCR_IMAGE}:${IMAGE_TAG}` — no `build:` on server
-- `env_file: ../.env`
-- `volumes: ../data:/app/data`
-- Run with: `docker compose --env-file ~/sushkabot/.env ...`
+- `env_file: ${ENV_FILE}` — set `export ENV_FILE=~/sushkabot/.env` before compose
+- `volumes: ${DATA_DIR}:/app/data` — set `export DATA_DIR=~/sushkabot/data`
+- Run from `~/sushkabot/app`: `docker compose --env-file "$ENV_FILE" ...`
 
 One-time bootstrap (as deploy user, no sudo):
 
