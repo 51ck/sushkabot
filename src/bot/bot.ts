@@ -4,6 +4,7 @@ import type { AppDatabase } from "../db/client.ts";
 import { chats } from "../db/schema.ts";
 import { SchedulerService } from "../services/scheduler.ts";
 import type { BotContext } from "./context.ts";
+import { registerChatLogHandlers } from "./handlers/chat-log.ts";
 import { registerCheckinHandlers } from "./handlers/checkin.ts";
 import { registerCommonHandlers } from "./handlers/common.ts";
 import { registerDevHandlers } from "./handlers/dev.ts";
@@ -25,6 +26,7 @@ export function createBot(
   });
 
   registerCommonHandlers(bot);
+  registerChatLogHandlers(bot);
   registerSetupWizardHandlers(bot);
   registerSettingsHandlers(bot);
   registerCheckinHandlers(bot);

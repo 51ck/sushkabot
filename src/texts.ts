@@ -1,18 +1,18 @@
 export const texts = {
-  help: `Sushkabot — sobriety check-in bot
+  help: `Sushkabot — вечерний чек-ин сушки
 
-Group commands:
-/setup — configure this chat with buttons (admin)
-/config — edit settings with buttons (admin)
-/join — opt in to tracking
-/leave — opt out of tracking
-/status — today's window and your streak
-/help — this message
+Команды в группе:
+/stats — твоя статистика и стрики
+/help — этот список
 
-DM commands:
-/settings — personal timezone (button picker)
+Админам:
+/setup — настроить группу
+/config — изменить настройки
 
-Admins can use /force_open and /force_close in development mode.`,
+В личке:
+/settings — часовой пояс
+
+Боту нужны права админа на удаление сообщений и Privacy Mode выключен.`,
 
   setupDone: "Setup complete! Check-ins will run on schedule.",
   notGroup: "This command only works in groups.",
@@ -22,8 +22,10 @@ Admins can use /force_open and /force_close in development mode.`,
   leaveSuccess: "You left check-in tracking. Past check-ins are kept.",
   alreadyJoined: "You are already tracked in this chat.",
   notJoined: "You are not tracked in this chat.",
-  checkinRecorded: "Recorded ✅",
-  checkinClosed: "Check-in closed",
+  checkinSober: "Красавчик 💪",
+  checkinMinorSlip: "Записано",
+  checkinMajorSlip: "Принято",
+  checkinClosed: "Окно закрыто",
   forceOpenDone: "Check-in window opened.",
   forceCloseDone: "Check-in window closed and summary posted.",
   devOnly: "This command is only available in development mode.",

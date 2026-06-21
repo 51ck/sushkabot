@@ -3,7 +3,10 @@ import type { Api } from "grammy";
 import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
 import { type Chat, chats, dailyWindows } from "../db/schema.ts";
-import { countAnswered, countJoinedMembers } from "./members.ts";
+import { cleanupStaleBotPosts, trackBotPost } from "./bot-posts.ts";
+import { generateCheckinBody } from "./llm.ts";
+import { recordLlmGeneration } from "./llm-generations.ts";
+import { countAnswered, countJoinedMembers, recordAbsentAsMinorSlip } from "./members.ts";
 import type { SchedulerService } from "./scheduler.ts";
 import { postSummary } from "./summary.ts";
 import { buildWindowMessage, computeCheckinDate, computeWindowClose } from "./window-message.ts";
@@ -37,6 +40,14 @@ export async function openWindow(params: {
     }
   }
 
+  await cleanupStaleBotPosts({
+    db,
+    api,
+    chatId: chat.id,
+    telegramChatId: chat.telegramChatId,
+    keepMessageId: existing?.messageId ?? null,
+  });
+
   const opensAt = now.toUTC();
   const closesAt = computeWindowClose(opensAt, chat.windowDurationMinutes);
 
@@ -50,6 +61,10 @@ export async function openWindow(params: {
         windowOpensAt: toIso(opensAt),
         windowClosesAt: toIso(closesAt),
         messageId: null,
+        generatedBody: null,
+        generatedSummaryIntro: null,
+        liveBody: null,
+        liveBodyAt: null,
       })
       .where(eq(dailyWindows.id, existing.id));
     const updated = await db.query.dailyWindows.findFirst({
@@ -78,6 +93,19 @@ export async function openWindow(params: {
   if (!windowRow.messageId) {
     const answeredCount = await countAnswered(db, windowRow.id);
     const joinedCount = await countJoinedMembers(db, chat.id);
+
+    let generatedBody = windowRow.generatedBody;
+    if (!generatedBody) {
+      generatedBody = await generateCheckinBody({
+        date: windowRow.checkinDate,
+        answeredCount,
+        joinedCount,
+      });
+      await db.update(dailyWindows).set({ generatedBody }).where(eq(dailyWindows.id, windowRow.id));
+      await recordLlmGeneration({ db, chatId: chat.id, kind: "open", text: generatedBody });
+      windowRow = { ...windowRow, generatedBody };
+    }
+
     const { text, replyMarkup } = buildWindowMessage({
       chat,
       checkinDate: windowRow.checkinDate,
@@ -85,6 +113,7 @@ export async function openWindow(params: {
       joinedCount,
       closesAt,
       now: DateTime.utc(),
+      generatedBody,
     });
 
     const message = await api.sendMessage(Number(chat.telegramChatId), text, {
@@ -95,6 +124,14 @@ export async function openWindow(params: {
       .update(dailyWindows)
       .set({ messageId: message.message_id })
       .where(eq(dailyWindows.id, windowRow.id));
+
+    await trackBotPost({
+      db,
+      chatId: chat.id,
+      telegramMessageId: message.message_id,
+      kind: "window",
+      dailyWindowId: windowRow.id,
+    });
 
     windowRow = { ...windowRow, messageId: message.message_id };
   }
@@ -118,15 +155,21 @@ export async function closeWindow(params: {
     return;
   }
 
+  await recordAbsentAsMinorSlip({ db, chatId: chat.id, window });
+
   const closesAt = DateTime.fromISO(window.windowClosesAt, { zone: "utc" });
+  const answeredCount = await countAnswered(db, window.id);
+  const joinedCount = await countJoinedMembers(db, chat.id);
+  const body = window.liveBody ?? window.generatedBody;
   const { text } = buildWindowMessage({
     chat,
     checkinDate: window.checkinDate,
-    answeredCount: await countAnswered(db, window.id),
-    joinedCount: await countJoinedMembers(db, chat.id),
+    answeredCount,
+    joinedCount,
     closesAt,
     now: DateTime.utc(),
     closed: true,
+    generatedBody: body,
   });
 
   if (window.messageId) {
@@ -180,11 +223,19 @@ export async function upsertChat(
     checkinHour: number;
     checkinMinute: number;
     windowDurationMinutes: number;
-    questionText: string;
-    responseMode: string;
+    questionText?: string;
+    responseMode?: string;
     buttonLabels?: string | null;
   },
 ): Promise<Chat> {
+  const payload = {
+    ...data,
+    questionText: data.questionText ?? "Оступился? Пидорнулся?",
+    responseMode: data.responseMode ?? "sushka",
+    buttonLabels: data.buttonLabels ?? null,
+    enabled: true as const,
+  };
+
   const existing = await db.query.chats.findFirst({
     where: eq(chats.telegramChatId, data.telegramChatId),
   });
@@ -192,7 +243,7 @@ export async function upsertChat(
   if (existing) {
     const updated = await db
       .update(chats)
-      .set({ ...data, enabled: true })
+      .set(payload)
       .where(eq(chats.id, existing.id))
       .returning();
     const row = updated[0];
@@ -200,10 +251,7 @@ export async function upsertChat(
     return row;
   }
 
-  const inserted = await db
-    .insert(chats)
-    .values({ ...data, enabled: true })
-    .returning();
+  const inserted = await db.insert(chats).values(payload).returning();
   const row = inserted[0];
   if (!row) throw new Error("Failed to insert chat");
   return row;

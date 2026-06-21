@@ -26,8 +26,12 @@ pnpm install
 pnpm dev
 ```
 
-5. Add the bot to a **private test group** (admin: post + edit messages).
+5. Add the bot to a **private test supergroup** with:
+   - admin rights: post, edit, and **delete messages**
+   - **Privacy Mode off** in @BotFather (`/setprivacy` → Disable) so the bot sees group messages for LLM context
 6. In the group: `/setup` → then `/force_open` to test without waiting for cron.
+
+Migrations run automatically on bot start (`src/index.ts`); in Docker they apply when the container restarts after deploy.
 
 ## Commands
 
@@ -35,14 +39,27 @@ pnpm dev
 |---------|-------|-------------|
 | `/setup` | Group | Admin setup wizard |
 | `/config` | Group | Edit settings |
-| `/join` | Group | Opt in to tracking |
-| `/leave` | Group | Opt out |
-| `/status` | Group | Window + streak |
-| `/settings` | DM | Timezone help |
-| `/settimezone` | DM | Set personal timezone |
+| `/stats` | Group | Personal stats (LLM); auto-deleted after 30 min if no reply |
+| `/status` | Group | Redirects to `/stats` |
+| `/settings` | DM | Timezone picker |
 | `/help` | Anywhere | Help |
 | `/force_open` | Group | Dev only — open window now |
 | `/force_close` | Group | Dev only — close + summary |
+
+Old check-in/summary/stats bot messages without replies are deleted when a new window opens.
+
+## Environment (optional LLM + tuning)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `OPENAI_API_KEY` | — | Enables LLM copy (DeepSeek via `OPENAI_API_BASE`) |
+| `OPENAI_API_BASE` | `https://api.openai.com/v1` | OpenAI-compatible API |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Model id |
+| `LLM_DEBOUNCE_MS` | `6000` | Delay before live window regen after answers |
+| `STATS_TTL_MINUTES` | `30` | `/stats` message TTL without replies |
+| `HIGHLIGHT_FULL_LIST_MAX` | `5` | List all answerers in LLM prompt up to this count |
+| `CHAT_SNIPPET_LIMIT` | `20` | Stored recent group messages per chat |
+| `LLM_STYLE_EXAMPLES` | `5` | Past generations fed as style context |
 
 ## Tests
 

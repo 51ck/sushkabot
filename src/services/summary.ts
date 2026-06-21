@@ -1,11 +1,18 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { Api } from "grammy";
 import type { AppDatabase } from "../db/client.ts";
-import { type Chat, chatMembers, checkins, type dailyWindows, members } from "../db/schema.ts";
-import type { CheckinStatus } from "../types.ts";
-import { statusToEmoji } from "../types.ts";
+import { type Chat, chatMembers, checkins, dailyWindows, members } from "../db/schema.ts";
+import {
+  type CheckinStatus,
+  normalizeCheckinStatus,
+  statusToEmoji,
+  statusToLabel,
+} from "../types.ts";
+import { trackBotPost } from "./bot-posts.ts";
+import { generateSummaryIntro } from "./llm.ts";
+import { recordLlmGeneration } from "./llm-generations.ts";
 import { countAnswered, countJoinedMembers } from "./members.ts";
-import { calculateStreak, streakLabel } from "./streak.ts";
+import { calculateIntoxStreak, calculateSoberStreak, formatDualStreak } from "./streak.ts";
 import { buildSummaryMessage, formatMemberMention } from "./window-message.ts";
 
 export async function postSummary(params: {
@@ -34,33 +41,70 @@ export async function postSummary(params: {
   const checkinByMember = new Map(windowCheckins.map((c) => [c.memberId, c]));
 
   const summaryLines: string[] = [];
+  let soberCount = 0;
+  let minorSlipCount = 0;
+  let majorSlipCount = 0;
 
   for (const member of joined) {
     const checkin = checkinByMember.get(member.memberId);
     const mention = formatMemberMention(member.username, member.displayName);
 
     if (!checkin) {
-      summaryLines.push(`⏳ ${mention} — no answer`);
+      summaryLines.push(`⏳ ${mention} — нет данных`);
       continue;
     }
 
+    const status = normalizeCheckinStatus(checkin.status);
+    if (status === "sober") soberCount += 1;
+    else if (status === "minor_slip") minorSlipCount += 1;
+    else majorSlipCount += 1;
+
     const history = await getMemberCheckinHistory(db, chat.id, member.memberId, window.checkinDate);
-    const streak = calculateStreak(history, window.checkinDate);
-    const emoji = statusToEmoji(checkin.status as CheckinStatus);
-    summaryLines.push(`${emoji} ${mention} — ${streakLabel(streak)}`);
+    const sober = calculateSoberStreak(history, window.checkinDate);
+    const intox = calculateIntoxStreak(history, window.checkinDate);
+    const emoji = statusToEmoji(status);
+    const label = statusToLabel(status);
+    summaryLines.push(`${emoji} ${mention} — ${label}, ${formatDualStreak(sober, intox)}`);
   }
 
   const joinedCount = await countJoinedMembers(db, chat.id);
   const answeredCount = await countAnswered(db, window.id);
 
+  let intro = window.generatedSummaryIntro;
+  if (!intro) {
+    intro = await generateSummaryIntro({
+      date: window.checkinDate,
+      answeredCount,
+      joinedCount,
+      soberCount,
+      minorSlipCount,
+      majorSlipCount,
+    });
+    if (intro) {
+      await db
+        .update(dailyWindows)
+        .set({ generatedSummaryIntro: intro })
+        .where(eq(dailyWindows.id, window.id));
+      await recordLlmGeneration({ db, chatId: chat.id, kind: "summary", text: intro });
+    }
+  }
+
   const text = buildSummaryMessage({
     checkinDate: window.checkinDate,
     joinedCount,
     answeredCount,
+    intro,
     lines: summaryLines,
   });
 
-  await api.sendMessage(Number(chat.telegramChatId), text);
+  const message = await api.sendMessage(Number(chat.telegramChatId), text);
+  await trackBotPost({
+    db,
+    chatId: chat.id,
+    telegramMessageId: message.message_id,
+    kind: "summary",
+    dailyWindowId: window.id,
+  });
 }
 
 async function getMemberCheckinHistory(
@@ -81,8 +125,7 @@ async function getMemberCheckinHistory(
 
   return rows
     .filter((r) => r.checkinDate <= asOfDate)
-    .map((r) => ({ date: r.checkinDate, status: r.status as CheckinStatus }));
+    .map((r) => ({ date: r.checkinDate, status: normalizeCheckinStatus(r.status) }));
 }
 
-// Re-export streakLabel from streak - actually I imported from types by mistake
-// streakLabel is in streak.ts
+export { getMemberCheckinHistory };

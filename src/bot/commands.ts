@@ -9,27 +9,25 @@ interface BotCommandEntry {
 /** Registers Telegram command menu entries (replaces manual BotFather /setcommands). */
 export async function registerBotCommands(api: Api): Promise<void> {
   const memberGroupCommands: BotCommandEntry[] = [
-    { command: "join", description: "Opt in to check-in tracking" },
-    { command: "leave", description: "Opt out of tracking" },
-    { command: "status", description: "Today's window and your streak" },
-    { command: "help", description: "Show available commands" },
+    { command: "stats", description: "Твоя статистика и стрики" },
+    { command: "help", description: "Список команд" },
   ];
 
   const adminGroupCommands: BotCommandEntry[] = [
-    { command: "setup", description: "Configure this group" },
-    { command: "config", description: "Edit group settings" },
+    { command: "setup", description: "Настроить группу" },
+    { command: "config", description: "Изменить настройки" },
     ...(isDevEnv()
       ? [
-          { command: "force_open", description: "Open check-in window now (dev)" },
-          { command: "force_close", description: "Close window and summary (dev)" },
+          { command: "force_open", description: "Открыть окно сейчас (dev)" },
+          { command: "force_close", description: "Закрыть окно и итоги (dev)" },
         ]
       : []),
     ...memberGroupCommands,
   ];
 
   const privateCommands: BotCommandEntry[] = [
-    { command: "settings", description: "Personal timezone" },
-    { command: "help", description: "Show available commands" },
+    { command: "settings", description: "Личный часовой пояс" },
+    { command: "help", description: "Список команд" },
   ];
 
   await api.setMyCommands(memberGroupCommands, { scope: { type: "all_group_chats" } });

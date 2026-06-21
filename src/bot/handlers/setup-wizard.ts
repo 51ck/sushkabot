@@ -4,15 +4,11 @@ import { chats } from "../../db/schema.ts";
 import { isAdmin } from "../../env.ts";
 import { upsertChat } from "../../services/window.ts";
 import { texts } from "../../texts.ts";
-import { DEFAULT_QUESTION, type ResponseMode } from "../../types.ts";
 import type { BotContext } from "../context.ts";
 import { isGroupChat, requireGroupAdmin } from "../context.ts";
 import {
   buildDurationKeyboard,
-  buildLabelsKeyboard,
   buildMenuKeyboard,
-  buildPresetKeyboard,
-  buildQuestionKeyboard,
   buildTimeKeyboard,
   buildTimezoneCityKeyboard,
   buildTimezoneCityText,
@@ -29,9 +25,6 @@ export interface WizardDraft {
   checkinMinute: number;
   timezone: string;
   windowDurationMinutes: number;
-  questionText: string;
-  responseMode: ResponseMode;
-  buttonLabels: string | null;
 }
 
 interface WizardSession {
@@ -57,9 +50,6 @@ function defaultDraft(): WizardDraft {
     checkinMinute: 0,
     timezone: "Europe/Moscow",
     windowDurationMinutes: 120,
-    questionText: DEFAULT_QUESTION,
-    responseMode: "yes_no",
-    buttonLabels: null,
   };
 }
 
@@ -69,9 +59,6 @@ function draftFromChat(chat: typeof chats.$inferSelect): WizardDraft {
     checkinMinute: chat.checkinMinute,
     timezone: chat.timezone,
     windowDurationMinutes: chat.windowDurationMinutes,
-    questionText: chat.questionText,
-    responseMode: chat.responseMode as ResponseMode,
-    buttonLabels: chat.buttonLabels,
   };
 }
 
@@ -79,39 +66,21 @@ function formatTime(draft: WizardDraft): string {
   return `${draft.checkinHour}:${String(draft.checkinMinute).padStart(2, "0")}`;
 }
 
-function presetLabel(mode: ResponseMode): string {
-  switch (mode) {
-    case "yes_no":
-      return "Yes / No";
-    case "yes_no_note":
-      return "Yes / No + note";
-    case "sober_slip_skip":
-      return "Sober / Slip / Skip";
-  }
-}
-
-function labelsSummary(draft: WizardDraft): string {
-  return draft.buttonLabels ? "custom" : "defaults";
-}
-
 function buildMenuText(mode: "setup" | "config", draft: WizardDraft): string {
-  const title = mode === "setup" ? "⚙️ Group setup" : "⚙️ Group settings";
+  const title = mode === "setup" ? "⚙️ Настройка группы" : "⚙️ Настройки группы";
   const hint =
-    mode === "setup"
-      ? "Tap a row to change it, then save when ready."
-      : "Tap a row to change it. Changes save immediately.";
+    mode === "setup" ? "Выбери параметры и нажми «Сохранить»." : "Изменения сохраняются сразу.";
 
   return [
     title,
     "",
     hint,
     "",
-    `⏰ Open time: ${formatTime(draft)}`,
-    `🌍 Timezone: ${draft.timezone}`,
-    `⏳ Window: ${draft.windowDurationMinutes} min`,
-    `❓ Question: ${draft.questionText}`,
-    `🔘 Buttons: ${presetLabel(draft.responseMode)}`,
-    `🏷 Labels: ${labelsSummary(draft)}`,
+    `⏰ Время: ${formatTime(draft)}`,
+    `🌍 Часовой пояс: ${draft.timezone}`,
+    `⏳ Окно ответа: ${draft.windowDurationMinutes} мин`,
+    "",
+    "Вопрос и кнопки фиксированы: «Оступился? Пидорнулся?»",
   ].join("\n");
 }
 
@@ -123,11 +92,11 @@ function buildScreenText(
   switch (screen) {
     case "time":
       return [
-        `⏰ Check-in time`,
+        `⏰ Время чек-ина`,
         "",
-        `Current: ${formatTime(draft)}`,
+        `Сейчас: ${formatTime(draft)}`,
         "",
-        "Pick hour, then minutes.",
+        "Выбери час и минуты.",
       ].join("\n");
     case "timezone":
       return buildTimezoneRegionText(draft.timezone);
@@ -135,35 +104,11 @@ function buildScreenText(
       return buildTimezoneCityText(timezoneRegion ?? "europe", draft.timezone);
     case "duration":
       return [
-        `⏳ Answer window`,
+        `⏳ Окно ответа`,
         "",
-        `Current: ${draft.windowDurationMinutes} min`,
+        `Сейчас: ${draft.windowDurationMinutes} мин`,
         "",
-        "How long members can answer after open.",
-      ].join("\n");
-    case "question":
-      return [
-        `❓ Check-in question`,
-        "",
-        `Current: ${draft.questionText}`,
-        "",
-        "Pick a question.",
-      ].join("\n");
-    case "preset":
-      return [
-        `🔘 Response buttons`,
-        "",
-        `Current: ${presetLabel(draft.responseMode)}`,
-        "",
-        "Defines streak logic (preset keys stay internal).",
-      ].join("\n");
-    case "labels":
-      return [
-        `🏷 Button labels`,
-        "",
-        `Current: ${labelsSummary(draft)}`,
-        "",
-        "Custom JSON labels can be added later; use defaults for now.",
+        "Сколько времени можно ответить после открытия.",
       ].join("\n");
     default:
       return "";
@@ -184,12 +129,6 @@ function buildScreenKeyboard(
       return buildTimezoneCityKeyboard(timezoneRegion ?? "europe", draft.timezone);
     case "duration":
       return buildDurationKeyboard(draft.windowDurationMinutes);
-    case "question":
-      return buildQuestionKeyboard(draft.questionText);
-    case "preset":
-      return buildPresetKeyboard(draft.responseMode);
-    case "labels":
-      return buildLabelsKeyboard();
     default:
       return buildMenuKeyboard(false);
   }
@@ -221,9 +160,6 @@ async function persistDraft(
       checkinHour: draft.checkinHour,
       checkinMinute: draft.checkinMinute,
       windowDurationMinutes: draft.windowDurationMinutes,
-      questionText: draft.questionText,
-      responseMode: draft.responseMode,
-      buttonLabels: draft.buttonLabels,
     });
     ctx.scheduler.registerChat(saved);
     session.dbChatId = saved.id;
@@ -238,9 +174,6 @@ async function persistDraft(
       checkinHour: draft.checkinHour,
       checkinMinute: draft.checkinMinute,
       windowDurationMinutes: draft.windowDurationMinutes,
-      questionText: draft.questionText,
-      responseMode: draft.responseMode,
-      buttonLabels: draft.buttonLabels,
     })
     .where(eq(chats.id, session.dbChatId))
     .returning();
@@ -328,7 +261,7 @@ export function registerSetupWizardHandlers(bot: Bot<BotContext>): void {
     const key = sessionKey(String(ctx.chat.id), ctx.from.id);
     const session = sessions.get(key);
     if (!session) {
-      await ctx.answerCallbackQuery({ text: "Session expired. Run /setup or /config again." });
+      await ctx.answerCallbackQuery({ text: "Сессия истекла. Запусти /setup или /config снова." });
       return;
     }
 
@@ -339,7 +272,7 @@ export function registerSetupWizardHandlers(bot: Bot<BotContext>): void {
 
     const messageId = ctx.callbackQuery.message?.message_id;
     if (messageId !== session.messageId) {
-      await ctx.answerCallbackQuery({ text: "Use the latest settings message." });
+      await ctx.answerCallbackQuery({ text: "Используй последнее сообщение настроек." });
       return;
     }
 
@@ -377,37 +310,19 @@ export function registerSetupWizardHandlers(bot: Bot<BotContext>): void {
       case "hour":
         session.draft.checkinHour = parsed.hour;
         await applyFieldChange(ctx, session, false);
-        await ctx.answerCallbackQuery({ text: `Time: ${formatTime(session.draft)}` });
+        await ctx.answerCallbackQuery({ text: `Время: ${formatTime(session.draft)}` });
         return;
 
       case "minute":
         session.draft.checkinMinute = parsed.minute;
         await applyFieldChange(ctx, session, true);
-        await ctx.answerCallbackQuery({ text: `Time: ${formatTime(session.draft)}` });
+        await ctx.answerCallbackQuery({ text: `Время: ${formatTime(session.draft)}` });
         return;
 
       case "duration":
         session.draft.windowDurationMinutes = parsed.minutes;
         await applyFieldChange(ctx, session, true);
-        await ctx.answerCallbackQuery({ text: `${parsed.minutes} min` });
-        return;
-
-      case "question":
-        session.draft.questionText = parsed.text;
-        await applyFieldChange(ctx, session, true);
-        await ctx.answerCallbackQuery();
-        return;
-
-      case "preset":
-        session.draft.responseMode = parsed.mode;
-        await applyFieldChange(ctx, session, true);
-        await ctx.answerCallbackQuery({ text: presetLabel(parsed.mode) });
-        return;
-
-      case "labels_clear":
-        session.draft.buttonLabels = null;
-        await applyFieldChange(ctx, session, true);
-        await ctx.answerCallbackQuery({ text: "Default labels" });
+        await ctx.answerCallbackQuery({ text: `${parsed.minutes} мин` });
         return;
 
       case "back":
@@ -422,14 +337,14 @@ export function registerSetupWizardHandlers(bot: Bot<BotContext>): void {
         await ctx.api.editMessageText(
           Number(session.telegramChatId),
           session.messageId,
-          session.mode === "setup" ? "Setup cancelled." : "Settings closed.",
+          session.mode === "setup" ? "Настройка отменена." : "Настройки закрыты.",
         );
         await ctx.answerCallbackQuery();
         return;
 
       case "save":
         if (session.mode !== "setup") {
-          await ctx.answerCallbackQuery({ text: "Already saved." });
+          await ctx.answerCallbackQuery({ text: "Уже сохранено." });
           return;
         }
         await persistDraft(ctx, session);
@@ -441,11 +356,10 @@ export function registerSetupWizardHandlers(bot: Bot<BotContext>): void {
             texts.setupDone,
             "",
             `⏰ ${formatTime(session.draft)} ${session.draft.timezone}`,
-            `⏳ ${session.draft.windowDurationMinutes} min window`,
-            `❓ ${session.draft.questionText}`,
+            `⏳ окно ${session.draft.windowDurationMinutes} мин`,
           ].join("\n"),
         );
-        await ctx.answerCallbackQuery({ text: "Saved ✅" });
+        await ctx.answerCallbackQuery({ text: "Сохранено ✅" });
         return;
     }
   });

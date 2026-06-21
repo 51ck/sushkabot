@@ -1,16 +1,17 @@
 import { and, count, eq, sql } from "drizzle-orm";
-import type { Api, Bot } from "grammy";
+import type { Api } from "grammy";
 import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
 import { type Chat, chatMembers, chats, checkins, dailyWindows, members } from "../db/schema.ts";
-import {
-  type CheckinStatus,
-  type PresetButtonKey,
-  presetKeyToStatus,
-  type ResponseMode,
-} from "../types.ts";
-import { debouncedEditMessage } from "./message-debounce.ts";
+import { type CheckinButtonKey, type CheckinStatus, resolveCheckinStatus } from "../types.ts";
+import { getPreviousDayStatus } from "./checkin-status.ts";
+import { buildWindowHighlightContext, highlightsHash } from "./highlights.ts";
+import { generateLiveWindowBody } from "./llm.ts";
+import { getRecentLlmGenerations, recordLlmGeneration } from "./llm-generations.ts";
+import { debouncedEditMessage, debouncedLlmRegen } from "./message-debounce.ts";
 import { buildWindowMessage } from "./window-message.ts";
+
+const lastHighlightHash = new Map<string, string>();
 
 export async function getChatByTelegramId(
   db: AppDatabase,
@@ -119,7 +120,7 @@ export async function getOpenWindow(
   });
 }
 
-export async function refreshWindowMessage(
+async function applyWindowMessageEdit(
   api: Api,
   db: AppDatabase,
   chat: Chat,
@@ -131,6 +132,8 @@ export async function refreshWindowMessage(
   const joinedCount = await countJoinedMembers(db, chat.id);
   const now = DateTime.utc();
   const closesAt = DateTime.fromISO(window.windowClosesAt, { zone: "utc" });
+  const body = window.liveBody ?? window.generatedBody;
+
   const { text, replyMarkup } = buildWindowMessage({
     chat,
     checkinDate: window.checkinDate,
@@ -139,6 +142,7 @@ export async function refreshWindowMessage(
     closesAt,
     now,
     closed: window.status !== "open",
+    generatedBody: body,
   });
 
   await debouncedEditMessage(api, {
@@ -149,17 +153,84 @@ export async function refreshWindowMessage(
   });
 }
 
+function scheduleLiveWindowRegen(api: Api, db: AppDatabase, chat: Chat, windowId: number): void {
+  const regenKey = `live:${chat.id}:${windowId}`;
+
+  debouncedLlmRegen(regenKey, async () => {
+    const window = await db.query.dailyWindows.findFirst({
+      where: eq(dailyWindows.id, windowId),
+    });
+    if (!window || window.status !== "open" || !window.messageId) return;
+
+    const answeredCount = await countAnswered(db, window.id);
+    const joinedCount = await countJoinedMembers(db, chat.id);
+    const closesAt = DateTime.fromISO(window.windowClosesAt, { zone: "utc" });
+    const styleExamples = await getRecentLlmGenerations(db, chat.id);
+
+    const ctx = await buildWindowHighlightContext({
+      db,
+      chatId: chat.id,
+      windowId: window.id,
+      checkinDate: window.checkinDate,
+      answeredCount,
+      joinedCount,
+      closesAt,
+      styleExamples,
+    });
+
+    const hash = highlightsHash(ctx.highlights);
+    const hashKey = `${chat.id}:${window.id}`;
+    if (lastHighlightHash.get(hashKey) === hash && window.liveBody) return;
+    lastHighlightHash.set(hashKey, hash);
+
+    const liveBody = await generateLiveWindowBody(ctx);
+    if (!liveBody) {
+      await applyWindowMessageEdit(api, db, chat, window);
+      return;
+    }
+
+    const nowIso = DateTime.utc().toISO() ?? new Date().toISOString();
+    await db
+      .update(dailyWindows)
+      .set({ liveBody, liveBodyAt: nowIso })
+      .where(eq(dailyWindows.id, window.id));
+
+    await recordLlmGeneration({ db, chatId: chat.id, kind: "live", text: liveBody });
+
+    const updated = { ...window, liveBody, liveBodyAt: nowIso };
+    await applyWindowMessageEdit(api, db, chat, updated);
+  });
+}
+
+export async function refreshWindowMessage(
+  api: Api,
+  db: AppDatabase,
+  chat: Chat,
+  window: typeof dailyWindows.$inferSelect,
+): Promise<void> {
+  await applyWindowMessageEdit(api, db, chat, window);
+  if (window.status === "open") {
+    scheduleLiveWindowRegen(api, db, chat, window.id);
+  }
+}
+
 export async function recordCheckin(params: {
   db: AppDatabase;
   api: Api;
   chat: Chat;
   window: typeof dailyWindows.$inferSelect;
   memberId: number;
-  presetKey: PresetButtonKey;
+  buttonKey: CheckinButtonKey;
 }): Promise<CheckinStatus> {
-  const { db, api, chat, window, memberId, presetKey } = params;
-  const mode = chat.responseMode as ResponseMode;
-  const status = presetKeyToStatus(mode, presetKey);
+  const { db, api, chat, window, memberId, buttonKey } = params;
+
+  const previousDayStatus = await getPreviousDayStatus({
+    db,
+    chatId: chat.id,
+    memberId,
+    checkinDate: window.checkinDate,
+  });
+  const status = resolveCheckinStatus(buttonKey, previousDayStatus);
 
   const existing = await db.query.checkins.findFirst({
     where: and(eq(checkins.dailyWindowId, window.id), eq(checkins.memberId, memberId)),
@@ -184,4 +255,36 @@ export async function recordCheckin(params: {
   return status;
 }
 
-export type BotLike = Pick<Bot, "api">;
+/** Joined members who never answered get «оступился» when the window closes. */
+export async function recordAbsentAsMinorSlip(params: {
+  db: AppDatabase;
+  chatId: number;
+  window: typeof dailyWindows.$inferSelect;
+}): Promise<number> {
+  const { db, chatId, window } = params;
+
+  const joined = await db.query.chatMembers.findMany({
+    where: and(eq(chatMembers.chatId, chatId), eq(chatMembers.active, true)),
+  });
+
+  const existing = await db.query.checkins.findMany({
+    where: eq(checkins.dailyWindowId, window.id),
+  });
+  const answeredMemberIds = new Set(existing.map((c) => c.memberId));
+
+  let created = 0;
+  for (const member of joined) {
+    if (answeredMemberIds.has(member.memberId)) continue;
+
+    await db.insert(checkins).values({
+      dailyWindowId: window.id,
+      chatId,
+      memberId: member.memberId,
+      checkinDate: window.checkinDate,
+      status: "minor_slip",
+    });
+    created += 1;
+  }
+
+  return created;
+}

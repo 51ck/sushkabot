@@ -1,7 +1,10 @@
 import type { Api, InlineKeyboard } from "grammy";
+import { env } from "../env.ts";
 
-const pending = new Map<string, ReturnType<typeof setTimeout>>();
-const MIN_INTERVAL_MS = Number(process.env.DEBOUNCE_MS ?? 2000);
+const editPending = new Map<string, ReturnType<typeof setTimeout>>();
+const llmPending = new Map<string, ReturnType<typeof setTimeout>>();
+
+const MIN_EDIT_INTERVAL_MS = Number(process.env.DEBOUNCE_MS ?? 2000);
 
 export async function debouncedEditMessage(
   api: Api,
@@ -12,14 +15,14 @@ export async function debouncedEditMessage(
     reply_markup?: InlineKeyboard;
   },
 ): Promise<void> {
-  const key = `${params.chat_id}:${params.message_id}`;
+  const key = `edit:${params.chat_id}:${params.message_id}`;
 
-  const existing = pending.get(key);
+  const existing = editPending.get(key);
   if (existing) clearTimeout(existing);
 
   await new Promise<void>((resolve) => {
     const timer = setTimeout(async () => {
-      pending.delete(key);
+      editPending.delete(key);
       try {
         await api.editMessageText(params.chat_id, params.message_id, params.text, {
           reply_markup: params.reply_markup,
@@ -28,12 +31,30 @@ export async function debouncedEditMessage(
         // Message may be unchanged or deleted
       }
       resolve();
-    }, MIN_INTERVAL_MS);
-    pending.set(key, timer);
+    }, MIN_EDIT_INTERVAL_MS);
+    editPending.set(key, timer);
   });
 }
 
+export function debouncedLlmRegen(key: string, fn: () => Promise<void>): void {
+  const existing = llmPending.get(key);
+  if (existing) clearTimeout(existing);
+
+  const timer = setTimeout(async () => {
+    llmPending.delete(key);
+    try {
+      await fn();
+    } catch (error) {
+      console.warn("LLM regen failed:", error);
+    }
+  }, env.LLM_DEBOUNCE_MS);
+
+  llmPending.set(key, timer);
+}
+
 export function clearDebounceTimers(): void {
-  for (const timer of pending.values()) clearTimeout(timer);
-  pending.clear();
+  for (const timer of editPending.values()) clearTimeout(timer);
+  editPending.clear();
+  for (const timer of llmPending.values()) clearTimeout(timer);
+  llmPending.clear();
 }

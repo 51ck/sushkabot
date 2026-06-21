@@ -16,8 +16,8 @@ const baseChat: Chat = {
   checkinHour: 23,
   checkinMinute: 0,
   windowDurationMinutes: 120,
-  questionText: "Was you sober today?",
-  responseMode: "yes_no",
+  questionText: "Оступился? Пидорнулся?",
+  responseMode: "sushka",
   buttonLabels: null,
   nudgeEnabled: false,
   enabled: true,
@@ -36,10 +36,10 @@ describe("window math", () => {
     expect(computeCheckinDate(openAt)).toBe("2026-05-26");
   });
 
-  test("formatCountdown shows hours and minutes", () => {
+  test("formatCountdown shows hours and minutes in Russian", () => {
     const closes = DateTime.fromISO("2026-05-27T01:00:00Z");
     const now = DateTime.fromISO("2026-05-26T23:00:00Z");
-    expect(formatCountdown(closes, now)).toBe("2h 0m left");
+    expect(formatCountdown(closes, now)).toBe("2ч 0м");
   });
 });
 
@@ -53,8 +53,22 @@ describe("buildWindowMessage", () => {
       closesAt: DateTime.fromISO("2026-05-27T01:00:00", { zone: "Europe/Moscow" }),
       now: DateTime.fromISO("2026-05-26T23:00:00", { zone: "Europe/Moscow" }),
     });
-    expect(text).toContain("3 of 7 joined members answered");
-    expect(text).toContain("Was you sober today?");
+    expect(text).toContain("3/7 ответили");
+    expect(text).toContain("Оступился? Пидорнулся?");
+    expect(text).toContain("🌙 Сушка");
+  });
+
+  test("uses generated body when provided", () => {
+    const { text } = buildWindowMessage({
+      chat: baseChat,
+      checkinDate: "2026-05-26",
+      answeredCount: 1,
+      joinedCount: 2,
+      closesAt: DateTime.fromISO("2026-05-27T01:00:00Z"),
+      now: DateTime.fromISO("2026-05-26T23:00:00Z"),
+      generatedBody: "Ну что, честно?",
+    });
+    expect(text).toContain("Ну что, честно?");
   });
 
   test("closed message has no keyboard", () => {
@@ -67,7 +81,7 @@ describe("buildWindowMessage", () => {
       now: DateTime.fromISO("2026-05-27T02:00:00Z"),
       closed: true,
     });
-    expect(text).toContain("Check-in closed");
+    expect(text).toContain("Окно закрыто");
     expect(replyMarkup).toBeUndefined();
   });
 });
