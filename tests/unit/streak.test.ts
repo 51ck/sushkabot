@@ -1,36 +1,161 @@
 import { describe, expect, test } from "bun:test";
-import { calculateStreak, streakLabel } from "../../src/services/streak.ts";
+import {
+  buildMemberStats,
+  calculateIntoxStreak,
+  calculateMaxStreaks,
+  calculateSoberStreak,
+  calculateStreak,
+  detectTodayEvent,
+  streakLabel,
+} from "../../src/services/streak.ts";
 import type { CheckinStatus } from "../../src/types.ts";
 
-describe("calculateStreak", () => {
-  test("counts consecutive sober days before asOfDate", () => {
-    const history = [
-      { date: "2026-05-25", status: "sober" as CheckinStatus },
-      { date: "2026-05-24", status: "sober" as CheckinStatus },
-      { date: "2026-05-23", status: "slip" as CheckinStatus },
-    ];
-    expect(calculateStreak(history, "2026-05-26")).toBe(2);
+function days(entries: Array<[string, CheckinStatus]>) {
+  return entries.map(([date, status]) => ({ date, status }));
+}
+
+describe("calculateSoberStreak", () => {
+  test("counts consecutive sober days including asOfDate", () => {
+    const history = days([
+      ["2026-05-26", "sober"],
+      ["2026-05-25", "sober"],
+      ["2026-05-24", "sober"],
+      ["2026-05-23", "major_slip"],
+    ]);
+    expect(calculateSoberStreak(history, "2026-05-26")).toBe(3);
   });
 
-  test("skip does not break streak", () => {
-    const history = [
-      { date: "2026-05-25", status: "sober" as CheckinStatus },
-      { date: "2026-05-24", status: "skipped" as CheckinStatus },
-      { date: "2026-05-23", status: "sober" as CheckinStatus },
-    ];
-    expect(calculateStreak(history, "2026-05-26")).toBe(2);
+  test("single minor slip does not break sober streak", () => {
+    const history = days([
+      ["2026-05-26", "sober"],
+      ["2026-05-25", "minor_slip"],
+      ["2026-05-24", "sober"],
+      ["2026-05-23", "sober"],
+    ]);
+    expect(calculateSoberStreak(history, "2026-05-26")).toBe(3);
   });
 
-  test("streak resets after slip", () => {
-    const history = [{ date: "2026-05-25", status: "slip" as CheckinStatus }];
+  test("10 sober + 1 minor keeps streak at 10", () => {
+    const history: { date: string; status: CheckinStatus }[] = [];
+    for (let i = 0; i < 10; i++) {
+      const d = 25 - i;
+      history.push({ date: `2026-05-${String(d).padStart(2, "0")}`, status: "sober" });
+    }
+    history.push({ date: "2026-05-26", status: "minor_slip" });
+    expect(calculateSoberStreak(history, "2026-05-26")).toBe(10);
+  });
+
+  test("two consecutive minors break sober streak", () => {
+    const history = days([
+      ["2026-05-26", "minor_slip"],
+      ["2026-05-25", "minor_slip"],
+      ["2026-05-24", "sober"],
+      ["2026-05-23", "sober"],
+    ]);
+    expect(calculateSoberStreak(history, "2026-05-26")).toBe(0);
+  });
+
+  test("major slip breaks sober streak immediately", () => {
+    const history = days([
+      ["2026-05-26", "major_slip"],
+      ["2026-05-25", "sober"],
+      ["2026-05-24", "sober"],
+    ]);
+    expect(calculateSoberStreak(history, "2026-05-26")).toBe(0);
+  });
+});
+
+describe("calculateIntoxStreak", () => {
+  test("counts consecutive slip days", () => {
+    const history = days([
+      ["2026-05-26", "minor_slip"],
+      ["2026-05-25", "minor_slip"],
+      ["2026-05-24", "sober"],
+    ]);
+    expect(calculateIntoxStreak(history, "2026-05-26")).toBe(2);
+  });
+
+  test("major alone gives intox streak 1", () => {
+    const history = days([["2026-05-26", "major_slip"]]);
+    expect(calculateIntoxStreak(history, "2026-05-26")).toBe(1);
+  });
+
+  test("sober day breaks intox streak", () => {
+    const history = days([
+      ["2026-05-26", "sober"],
+      ["2026-05-25", "minor_slip"],
+    ]);
+    expect(calculateIntoxStreak(history, "2026-05-26")).toBe(0);
+  });
+});
+
+describe("buildMemberStats", () => {
+  test("10 sober + minor + minor gives sober 0 intox 2", () => {
+    const history: { date: string; status: CheckinStatus }[] = [];
+    for (let i = 0; i < 10; i++) {
+      history.push({
+        date: `2026-05-${String(15 + i).padStart(2, "0")}`,
+        status: "sober",
+      });
+    }
+    history.push({ date: "2026-05-25", status: "minor_slip" });
+    history.push({ date: "2026-05-26", status: "minor_slip" });
+
+    const stats = buildMemberStats(history, "2026-05-26");
+    expect(stats.soberCurrent).toBe(0);
+    expect(stats.intoxCurrent).toBe(2);
+  });
+});
+
+describe("calculateMaxStreaks", () => {
+  test("tracks historical maxima", () => {
+    const history = days([
+      ["2026-05-01", "sober"],
+      ["2026-05-02", "sober"],
+      ["2026-05-03", "sober"],
+      ["2026-05-04", "major_slip"],
+      ["2026-05-05", "minor_slip"],
+      ["2026-05-06", "minor_slip"],
+    ]);
+    const { soberMax, intoxMax } = calculateMaxStreaks(history);
+    expect(soberMax).toBe(3);
+    expect(intoxMax).toBe(3);
+  });
+});
+
+describe("detectTodayEvent", () => {
+  test("grace minor after sober streak", () => {
+    const history = days([
+      ["2026-05-24", "sober"],
+      ["2026-05-25", "sober"],
+    ]);
+    expect(detectTodayEvent("minor_slip", history, "2026-05-26")).toBe("grace_minor");
+  });
+
+  test("milestone 7 on sober day", () => {
+    const history: { date: string; status: CheckinStatus }[] = [];
+    for (let i = 1; i <= 6; i++) {
+      history.push({ date: `2026-05-${String(i).padStart(2, "0")}`, status: "sober" });
+    }
+    expect(detectTodayEvent("sober", history, "2026-05-07")).toBe("milestone_7");
+  });
+});
+
+describe("calculateStreak alias", () => {
+  test("delegates to calculateSoberStreak", () => {
+    const history = days([["2026-05-25", "sober"]]);
     expect(calculateStreak(history, "2026-05-26")).toBe(0);
+    expect(
+      calculateStreak([...history, { date: "2026-05-26", status: "sober" }], "2026-05-26"),
+    ).toBe(2);
   });
 });
 
 describe("streakLabel", () => {
-  test("formats labels", () => {
-    expect(streakLabel(0)).toBe("streak reset");
-    expect(streakLabel(1)).toBe("1 day streak");
-    expect(streakLabel(12)).toBe("12 day streak");
+  test("formats labels in Russian", () => {
+    expect(streakLabel(0)).toBe("серия сброшена");
+    expect(streakLabel(1)).toBe("1 день");
+    expect(streakLabel(3)).toBe("3 дня");
+    expect(streakLabel(12)).toBe("12 дней");
   });
 });

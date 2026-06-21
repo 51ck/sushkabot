@@ -1,6 +1,6 @@
 # Sushkabot — Product & Technical Specification
 
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Status:** Living document — reflects implemented behavior in `src/` as of June 2026  
 **Audience:** Developers, operators, and future contributors
 
@@ -11,6 +11,7 @@
 | 0.1.0 | MVP: cron windows, check-ins, summaries, conversation-based `/setup` |
 | 0.2.0 | Inline-button settings wizard; region→city timezone picker; `setMyCommands` on boot; removed `@grammyjs/conversations` from bot wiring |
 | 0.3.0 | GHCR deploy pipeline; production Compose pull-only; VPS bootstrap script; `.dockerignore` |
+| 0.4.0 | Fixed Sushka buttons; dual sober/intox streaks; LLM window/summary/stats; live window regen; chat cleanup (`bot_posts`); `/stats` ephemeral |
 
 ---
 
@@ -20,8 +21,8 @@ Sushkabot is a **Telegram group bot** for **evening sobriety check-ins**. It:
 
 1. Posts a **daily reminder** in the group with **inline buttons**
 2. Accepts answers during a **configurable time window**
-3. **Edits the reminder in place** to show live progress (N/M joined members answered)
-4. Posts a **daily summary** at window close with per-member streaks
+3. **Edits the reminder in place** with LLM-generated copy and live highlights as members answer
+4. Posts a **daily summary** at window close with dual streaks (sober + intox)
 
 The bot is **stateless at runtime** — all durable state lives in SQLite. A single long-polling process handles Telegram updates and schedules per-chat jobs.
 
@@ -45,11 +46,14 @@ The bot is **stateless at runtime** — all durable state lives in SQLite. A sin
 ### 3.1 In scope (implemented)
 
 - Per-chat **inline-button settings wizard** (`/setup`, `/config`): single message edited in place — no chat Q&A
-- Settings fields: time (hour/minute buttons), timezone (region → city), window duration, question presets, response preset, label reset
+- Settings fields: time, timezone, window duration (question/buttons fixed)
 - Daily open/close window with cron + one-shot close timer
-- Inline button check-ins with join-on-first-answer
-- `/join`, `/leave`, `/status`, `/help`
-- DM `/settings` — two-level timezone picker; `/settimezone` redirects to `/settings`
+- Inline check-in buttons: Красавчик / Оступился / Пидорнулся
+- `/stats`, `/help` in group; `/status` redirects to `/stats`
+- LLM copy (optional): window open, live updates, summary intro, personal stats
+- Chat hygiene: delete old bot posts without replies on new window open; `/stats` TTL
+- Dual streaks: grace `minor_slip`; two consecutive slips break sober streak
+- DM `/settings` — timezone picker
 - **Telegram command menu** registered via `setMyCommands` on boot (scoped: group members, group admins, private chat)
 - Daily summary with streaks at window close
 - Restart-safe window recovery (stale open windows closed; close timers re-scheduled)
@@ -67,8 +71,8 @@ The bot is **stateless at runtime** — all durable state lives in SQLite. A sin
 | **Personal timezone in scheduling** | `members.timezone_override` stored via DM `/settings`; not used for window date, cron, or streaks. |
 | **Custom question text** | Wizard offers preset questions only; free-text question not in button UI. |
 | **Custom label JSON** | Wizard can reset to defaults; JSON entry not in button UI. |
-| **`/stats`** | Weekly/monthly aggregates — planned Phase 3. |
-| **Streak milestones** | 7/30/90-day celebrations — planned Phase 3. |
+| **`/stats` weekly aggregates** | Personal `/stats` implemented; group weekly rollups still Phase 3 |
+| **Streak milestones in summary** | Detected for LLM highlights; no separate celebration messages |
 | **i18n** | Bot chrome is English; question/labels customizable per chat. |
 | **Per-person window times** | v2 — separate DM reminders at different hours. |
 | **Webhook mode** | Long polling only. |

@@ -1,5 +1,4 @@
 import { InlineKeyboard } from "grammy";
-import type { ResponseMode } from "../../types.ts";
 
 export const SETTINGS_PREFIX = "set:";
 
@@ -91,27 +90,7 @@ export const DURATION_OPTIONS: { minutes: number; label: string }[] = [
 export const HOUR_OPTIONS = [19, 20, 21, 22, 23] as const;
 export const MINUTE_OPTIONS = [0, 15, 30, 45] as const;
 
-export const QUESTION_OPTIONS: { code: string; label: string; text: string }[] = [
-  { code: "default", label: "Was you sober today?", text: "Was you sober today?" },
-  { code: "formal", label: "Were you sober today?", text: "Were you sober today?" },
-  { code: "ru", label: "Ты трезвый сегодня?", text: "Ты трезвый сегодня?" },
-];
-
-export const PRESET_OPTIONS: { mode: ResponseMode; label: string }[] = [
-  { mode: "yes_no", label: "Yes / No" },
-  { mode: "yes_no_note", label: "Yes / No + note" },
-  { mode: "sober_slip_skip", label: "Sober / Slip / Skip" },
-];
-
-export type WizardScreen =
-  | "menu"
-  | "time"
-  | "timezone"
-  | "timezone_cities"
-  | "duration"
-  | "question"
-  | "preset"
-  | "labels";
+export type WizardScreen = "menu" | "time" | "timezone" | "timezone_cities" | "duration";
 
 export type SettingsCallback =
   | { type: "screen"; screen: WizardScreen }
@@ -121,9 +100,6 @@ export type SettingsCallback =
   | { type: "timezone_city"; iana: string }
   | { type: "timezone_back" }
   | { type: "duration"; minutes: number }
-  | { type: "question"; text: string }
-  | { type: "preset"; mode: ResponseMode }
-  | { type: "labels_clear" }
   | { type: "save" }
   | { type: "back" }
   | { type: "cancel" };
@@ -142,12 +118,19 @@ export function parseSettingsCallback(data: string): SettingsCallback | null {
   if (body === "back") return { type: "back" };
   if (body === "cancel") return { type: "cancel" };
   if (body === "tz_back") return { type: "timezone_back" };
-  if (body === "labels:clear") return { type: "labels_clear" };
 
   const screenMatch = /^screen:(.+)$/.exec(body);
   if (screenMatch) {
     const screen = screenMatch[1] as WizardScreen;
-    return { type: "screen", screen };
+    if (
+      screen === "menu" ||
+      screen === "time" ||
+      screen === "timezone" ||
+      screen === "timezone_cities" ||
+      screen === "duration"
+    ) {
+      return { type: "screen", screen };
+    }
   }
 
   const hourMatch = /^hour:(\d+)$/.exec(body);
@@ -170,19 +153,6 @@ export function parseSettingsCallback(data: string): SettingsCallback | null {
 
   const durMatch = /^dur:(\d+)$/.exec(body);
   if (durMatch) return { type: "duration", minutes: Number.parseInt(durMatch[1] ?? "", 10) };
-
-  const qMatch = /^q:(.+)$/.exec(body);
-  if (qMatch) {
-    const code = qMatch[1] ?? "";
-    const q = QUESTION_OPTIONS.find((o) => o.code === code);
-    if (q) return { type: "question", text: q.text };
-  }
-
-  const presetMatch = /^preset:(.+)$/.exec(body);
-  if (presetMatch) {
-    const mode = presetMatch[1] as ResponseMode;
-    if (PRESET_OPTIONS.some((p) => p.mode === mode)) return { type: "preset", mode };
-  }
 
   return null;
 }
@@ -270,11 +240,7 @@ export function buildMenuKeyboard(showSave: boolean): InlineKeyboard {
     .text("⏰ Time", `${SETTINGS_PREFIX}screen:time`)
     .text("🌍 Timezone", `${SETTINGS_PREFIX}screen:timezone`)
     .row()
-    .text("⏳ Window", `${SETTINGS_PREFIX}screen:duration`)
-    .text("❓ Question", `${SETTINGS_PREFIX}screen:question`)
-    .row()
-    .text("🔘 Buttons", `${SETTINGS_PREFIX}screen:preset`)
-    .text("🏷 Labels", `${SETTINGS_PREFIX}screen:labels`);
+    .text("⏳ Window", `${SETTINGS_PREFIX}screen:duration`);
 
   if (showSave) {
     kb.row()
@@ -309,29 +275,4 @@ export function buildDurationKeyboard(current: number): InlineKeyboard {
     kb.text(`${mark}${opt.label}`, `${SETTINGS_PREFIX}dur:${opt.minutes}`).row();
   }
   return kb.append(backButton());
-}
-
-export function buildQuestionKeyboard(current: string): InlineKeyboard {
-  const kb = new InlineKeyboard();
-  for (const q of QUESTION_OPTIONS) {
-    const mark = q.text === current ? "• " : "";
-    kb.text(`${mark}${q.label}`, `${SETTINGS_PREFIX}q:${q.code}`).row();
-  }
-  return kb.append(backButton());
-}
-
-export function buildPresetKeyboard(current: ResponseMode): InlineKeyboard {
-  const kb = new InlineKeyboard();
-  for (const p of PRESET_OPTIONS) {
-    const mark = p.mode === current ? "• " : "";
-    kb.text(`${mark}${p.label}`, `${SETTINGS_PREFIX}preset:${p.mode}`).row();
-  }
-  return kb.append(backButton());
-}
-
-export function buildLabelsKeyboard(): InlineKeyboard {
-  return new InlineKeyboard()
-    .text("Use default labels", `${SETTINGS_PREFIX}labels:clear`)
-    .row()
-    .append(backButton());
 }

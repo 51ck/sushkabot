@@ -1,65 +1,92 @@
 import { z } from "zod";
 
-export const responseModeSchema = z.enum(["yes_no", "yes_no_note", "sober_slip_skip"]);
-export type ResponseMode = z.infer<typeof responseModeSchema>;
+/** Fixed check-in button set for all chats. */
+export const CHECKIN_BUTTON_KEYS = ["krasavchik", "ostupilsya", "pidornulsya"] as const;
+export type CheckinButtonKey = (typeof CHECKIN_BUTTON_KEYS)[number];
 
-export const checkinStatusSchema = z.enum(["sober", "slip", "skipped"]);
+export const checkinStatusSchema = z.enum(["sober", "minor_slip", "major_slip"]);
 export type CheckinStatus = z.infer<typeof checkinStatusSchema>;
+
+/** Legacy values still present in older rows. */
+export type LegacyCheckinStatus = CheckinStatus | "slip" | "skipped";
 
 export const windowStatusSchema = z.enum(["open", "closed", "summarized"]);
 export type WindowStatus = z.infer<typeof windowStatusSchema>;
 
-export const buttonLabelsSchema = z.record(z.string(), z.string());
-export type ButtonLabels = z.infer<typeof buttonLabelsSchema>;
+export const DEFAULT_QUESTION = "Оступился? Пидорнулся?";
 
-export type PresetButtonKey = "yes" | "no" | "sober" | "slip" | "skip";
-
-export const DEFAULT_BUTTON_LABELS: Record<ResponseMode, Record<string, string>> = {
-  yes_no: { yes: "✅ Yes", no: "❌ No" },
-  yes_no_note: { yes: "✅ Yes", no: "❌ No" },
-  sober_slip_skip: { sober: "✅ Sober", slip: "❌ Slip", skip: "⏭ Skip" },
+export const DEFAULT_BUTTON_LABELS: Record<CheckinButtonKey, string> = {
+  krasavchik: "💪 Красавчик",
+  ostupilsya: "🍺 Оступился",
+  pidornulsya: "💥 Пидорнулся",
 };
 
-export const DEFAULT_QUESTION = "Was you sober today?";
+export function isCheckinButtonKey(key: string): key is CheckinButtonKey {
+  return (CHECKIN_BUTTON_KEYS as readonly string[]).includes(key);
+}
 
-export const PRESET_BUTTON_KEYS: Record<ResponseMode, PresetButtonKey[]> = {
-  yes_no: ["yes", "no"],
-  yes_no_note: ["yes", "no"],
-  sober_slip_skip: ["sober", "slip", "skip"],
-};
-
-export function presetKeyToStatus(mode: ResponseMode, key: PresetButtonKey): CheckinStatus {
-  if (mode === "sober_slip_skip") {
-    if (key === "sober") return "sober";
-    if (key === "slip") return "slip";
-    return "skipped";
+export function buttonKeyToBaseStatus(key: CheckinButtonKey): CheckinStatus {
+  switch (key) {
+    case "krasavchik":
+      return "sober";
+    case "ostupilsya":
+      return "minor_slip";
+    case "pidornulsya":
+      return "major_slip";
   }
-  return key === "yes" ? "sober" : "slip";
 }
 
-export function getButtonLabels(
-  mode: ResponseMode,
-  custom: Record<string, string> | null | undefined,
-): Record<string, string> {
-  const defaults = DEFAULT_BUTTON_LABELS[mode];
-  if (!custom) return defaults;
-  return { ...defaults, ...custom };
-}
-
-export function parseButtonLabels(json: string | null | undefined): Record<string, string> | null {
-  if (!json) return null;
-  const parsed: unknown = JSON.parse(json);
-  const result = buttonLabelsSchema.safeParse(parsed);
-  return result.success ? result.data : null;
-}
-
-export function statusToEmoji(status: CheckinStatus): string {
+export function normalizeCheckinStatus(status: string): CheckinStatus {
   switch (status) {
     case "sober":
-      return "✅";
+      return "sober";
+    case "minor_slip":
+      return "minor_slip";
+    case "major_slip":
+      return "major_slip";
     case "slip":
-      return "❌";
+      return "major_slip";
     case "skipped":
-      return "⏭";
+      return "minor_slip";
+    default:
+      return "major_slip";
+  }
+}
+
+/** Previous-day slip statuses escalate a new «Оступился» tap to «Пидорнулся». */
+export function isEscalatingPriorStatus(status: CheckinStatus | null): boolean {
+  if (!status) return false;
+  return status === "minor_slip" || status === "major_slip";
+}
+
+export function resolveCheckinStatus(
+  buttonKey: CheckinButtonKey,
+  previousDayStatus: CheckinStatus | null,
+): CheckinStatus {
+  if (buttonKey === "ostupilsya" && isEscalatingPriorStatus(previousDayStatus)) {
+    return "major_slip";
+  }
+  return buttonKeyToBaseStatus(buttonKey);
+}
+
+export function statusToEmoji(status: CheckinStatus | LegacyCheckinStatus): string {
+  switch (normalizeCheckinStatus(status)) {
+    case "sober":
+      return "💪";
+    case "minor_slip":
+      return "🍺";
+    case "major_slip":
+      return "💥";
+  }
+}
+
+export function statusToLabel(status: CheckinStatus | LegacyCheckinStatus): string {
+  switch (normalizeCheckinStatus(status)) {
+    case "sober":
+      return "красавчик";
+    case "minor_slip":
+      return "оступился";
+    case "major_slip":
+      return "пидорнулся";
   }
 }

@@ -2,7 +2,7 @@ import type { InlineKeyboard } from "grammy";
 import { DateTime } from "luxon";
 import { buildCheckinKeyboard } from "../bot/keyboards/checkin.ts";
 import type { Chat } from "../db/schema.ts";
-import { getButtonLabels, parseButtonLabels, type ResponseMode } from "../types.ts";
+import { DEFAULT_QUESTION } from "../types.ts";
 
 export function computeWindowClose(openAt: DateTime, durationMinutes: number): DateTime {
   return openAt.plus({ minutes: durationMinutes });
@@ -16,8 +16,8 @@ export function formatCountdown(closesAt: DateTime, now: DateTime): string {
   const diff = closesAt.diff(now, ["hours", "minutes"]).toObject();
   const hours = Math.max(0, Math.floor(diff.hours ?? 0));
   const minutes = Math.max(0, Math.floor(diff.minutes ?? 0));
-  if (hours > 0) return `${hours}h ${minutes}m left`;
-  return `${minutes}m left`;
+  if (hours > 0) return `${hours}ч ${minutes}м`;
+  return `${minutes}м`;
 }
 
 export function formatCloseTime(closesAt: DateTime, timezone: string): string {
@@ -32,26 +32,26 @@ export function buildWindowMessage(params: {
   closesAt: DateTime;
   now: DateTime;
   closed?: boolean;
+  generatedBody?: string | null;
 }): { text: string; replyMarkup: InlineKeyboard | undefined } {
-  const { chat, checkinDate, answeredCount, joinedCount, closesAt, now, closed } = params;
-  const mode = chat.responseMode as ResponseMode;
-  const labels = getButtonLabels(mode, parseButtonLabels(chat.buttonLabels));
-  const dateLabel = DateTime.fromISO(checkinDate).toFormat("MMM d");
+  const { chat, checkinDate, answeredCount, joinedCount, closesAt, now, closed, generatedBody } =
+    params;
+  const dateLabel = DateTime.fromISO(checkinDate).setLocale("ru").toFormat("d MMMM");
   const closeLabel = formatCloseTime(closesAt, chat.timezone);
   const countdown = formatCountdown(closesAt, now);
+  const body = generatedBody?.trim() || chat.questionText?.trim() || DEFAULT_QUESTION;
 
-  const lines = [`🌙 Evening check-in — ${dateLabel}`, "", chat.questionText];
+  const lines = [`🌙 Сушка · ${dateLabel}`, "", body];
 
   if (closed) {
-    lines.push("", "Check-in closed.");
+    lines.push("", "Окно закрыто.");
   } else {
-    lines.push(`Answer before ${closeLabel} (${countdown})`, "");
-    lines.push(`${answeredCount} of ${joinedCount} joined members answered`);
+    lines.push("", `⏱ до ${closeLabel} (${countdown}) · ${answeredCount}/${joinedCount} ответили`);
   }
 
   return {
     text: lines.join("\n"),
-    replyMarkup: closed ? undefined : buildCheckinKeyboard(mode, labels),
+    replyMarkup: closed ? undefined : buildCheckinKeyboard(),
   };
 }
 
@@ -59,13 +59,15 @@ export function buildSummaryMessage(params: {
   checkinDate: string;
   joinedCount: number;
   answeredCount: number;
+  intro?: string | null;
   lines: string[];
 }): string {
-  const dateLabel = DateTime.fromISO(params.checkinDate).toFormat("MMM d");
+  const dateLabel = DateTime.fromISO(params.checkinDate).setLocale("ru").toFormat("d MMMM");
+  const header = params.intro?.trim() || `📊 Итоги · ${dateLabel}`;
   return [
-    `📊 ${dateLabel} summary`,
+    header,
     "",
-    `Answered: ${params.answeredCount}/${params.joinedCount} joined`,
+    `Ответили: ${params.answeredCount}/${params.joinedCount}`,
     ...params.lines,
   ].join("\n");
 }

@@ -7,9 +7,21 @@ import {
   recordCheckin,
 } from "../../services/members.ts";
 import { texts } from "../../texts.ts";
+import type { CheckinStatus } from "../../types.ts";
 import type { BotContext } from "../context.ts";
 import { isGroupChat } from "../context.ts";
 import { parseCheckinCallback } from "../keyboards/checkin.ts";
+
+function toastForStatus(status: CheckinStatus): string {
+  switch (status) {
+    case "sober":
+      return texts.checkinSober;
+    case "minor_slip":
+      return texts.checkinMinorSlip;
+    case "major_slip":
+      return texts.checkinMajorSlip;
+  }
+}
 
 export function registerCheckinHandlers(bot: Bot<BotContext>): void {
   bot.on("callback_query:data", async (ctx) => {
@@ -46,15 +58,15 @@ export function registerCheckinHandlers(bot: Bot<BotContext>): void {
     const { memberId } = await ensureMember(ctx.db, ctx.from);
     await joinChatMember(ctx.db, chat.id, memberId);
 
-    await recordCheckin({
+    const status = await recordCheckin({
       db: ctx.db,
       api: ctx.api,
       chat,
       window,
       memberId,
-      presetKey: key,
+      buttonKey: key,
     });
 
-    await ctx.answerCallbackQuery({ text: texts.checkinRecorded });
+    await ctx.answerCallbackQuery({ text: toastForStatus(status) });
   });
 }

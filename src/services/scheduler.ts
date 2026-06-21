@@ -4,6 +4,7 @@ import type { Api, Bot } from "grammy";
 import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
 import { type Chat, chats, type DailyWindow, dailyWindows } from "../db/schema.ts";
+import { cleanupExpiredBotPosts } from "./bot-posts.ts";
 import { closeWindow, openWindow, recoverStaleWindows } from "./window.ts";
 
 type CloseTimer = ReturnType<typeof setTimeout>;
@@ -11,6 +12,7 @@ type CloseTimer = ReturnType<typeof setTimeout>;
 export class SchedulerService {
   private openCrons = new Map<number, Cron>();
   private closeTimers = new Map<number, CloseTimer>();
+  private maintenanceCron: Cron | null = null;
 
   constructor(
     private db: AppDatabase,
@@ -31,6 +33,10 @@ export class SchedulerService {
     for (const chat of enabledChats) {
       this.registerChat(chat);
     }
+
+    this.maintenanceCron = new Cron("* * * * *", { protect: true }, async () => {
+      await cleanupExpiredBotPosts({ db: this.db, api: this.getApi() });
+    });
   }
 
   registerChat(chat: Chat): void {
@@ -97,6 +103,10 @@ export class SchedulerService {
   stop(): void {
     for (const chatId of this.openCrons.keys()) {
       this.unregisterChat(chatId);
+    }
+    if (this.maintenanceCron) {
+      this.maintenanceCron.stop();
+      this.maintenanceCron = null;
     }
   }
 }
