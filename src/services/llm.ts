@@ -18,7 +18,7 @@ import { DEFAULT_QUESTION } from "../types.ts";
 import type { WindowHighlightContext } from "./highlights.ts";
 
 const REQUEST_TIMEOUT_MS = 8000;
-const MAX_COMPLETION_TOKENS = 512;
+const MAX_COMPLETION_TOKENS = 1024;
 
 export function isLlmEnabled(): boolean {
   return Boolean(env.OPENAI_API_KEY);
@@ -70,16 +70,27 @@ function truncateBody(text: string): string {
   return text.slice(0, 1200);
 }
 
-function buildCompletionPayload(messages: ChatMessage[]): Record<string, unknown> {
-  return {
+export function shouldDisableDeepSeekThinking(apiBase: string): boolean {
+  return apiBase.includes("deepseek");
+}
+
+export function buildLlmRequestPayload(
+  messages: ChatMessage[],
+  apiBase = env.OPENAI_API_BASE,
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
     model: env.OPENAI_MODEL,
     temperature: 0.9,
     max_tokens: MAX_COMPLETION_TOKENS,
     messages,
-    // DeepSeek V4 enables thinking by default; it can consume the whole budget
-    // and leave content empty on short copy tasks.
-    extra_body: { thinking: { type: "disabled" } },
   };
+
+  // DeepSeek V4: top-level field (not extra_body — that's OpenAI SDK only).
+  if (shouldDisableDeepSeekThinking(apiBase)) {
+    payload.thinking = { type: "disabled" };
+  }
+
+  return payload;
 }
 
 async function chatComplete(messages: ChatMessage[]): Promise<string | null> {
@@ -96,7 +107,7 @@ async function chatComplete(messages: ChatMessage[]): Promise<string | null> {
         "Content-Type": "application/json",
         Authorization: `Bearer ${env.OPENAI_API_KEY}`,
       },
-      body: JSON.stringify(buildCompletionPayload(messages)),
+      body: JSON.stringify(buildLlmRequestPayload(messages)),
       signal: controller.signal,
     });
 

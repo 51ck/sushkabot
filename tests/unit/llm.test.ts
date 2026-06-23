@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { extractCompletionText, normalizeApiBase } from "../../src/services/llm.ts";
+import {
+  buildLlmRequestPayload,
+  extractCompletionText,
+  normalizeApiBase,
+} from "../../src/services/llm.ts";
 
 describe("normalizeApiBase", () => {
   test("appends /v1 when missing", () => {
@@ -29,5 +33,24 @@ describe("extractCompletionText", () => {
       ],
     });
     expect(text).toBeNull();
+  });
+});
+
+describe("buildLlmRequestPayload", () => {
+  test("sends top-level thinking disabled for DeepSeek", () => {
+    const payload = buildLlmRequestPayload(
+      [{ role: "user", content: "hi" }],
+      "https://api.deepseek.com/v1",
+    );
+    expect(payload.thinking).toEqual({ type: "disabled" });
+    expect(payload.extra_body).toBeUndefined();
+  });
+
+  test("omits thinking for non-DeepSeek APIs", () => {
+    const payload = buildLlmRequestPayload(
+      [{ role: "user", content: "hi" }],
+      "https://api.openai.com/v1",
+    );
+    expect(payload.thinking).toBeUndefined();
   });
 });
