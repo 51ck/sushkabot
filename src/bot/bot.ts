@@ -8,6 +8,7 @@ import { registerChatLogHandlers } from "./handlers/chat-log.ts";
 import { registerCheckinHandlers } from "./handlers/checkin.ts";
 import { registerCommonHandlers } from "./handlers/common.ts";
 import { registerDevHandlers } from "./handlers/dev.ts";
+import { registerReactionHandlers } from "./handlers/reactions.ts";
 import { registerSettingsHandlers } from "./handlers/settings.ts";
 import { registerSetupWizardHandlers } from "./handlers/setup-wizard.ts";
 
@@ -27,6 +28,7 @@ export function createBot(
 
   registerCommonHandlers(bot);
   registerChatLogHandlers(bot);
+  registerReactionHandlers(bot);
   registerSetupWizardHandlers(bot);
   registerSettingsHandlers(bot);
   registerCheckinHandlers(bot);

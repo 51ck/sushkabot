@@ -45,6 +45,27 @@ export async function markBotPostReplied(
     .where(and(eq(botPosts.chatId, chatId), eq(botPosts.telegramMessageId, telegramMessageId)));
 }
 
+export async function markBotPostReacted(
+  db: AppDatabase,
+  chatId: number,
+  telegramMessageId: number,
+): Promise<void> {
+  await db
+    .update(botPosts)
+    .set({ hasReaction: true, deleteAfter: null })
+    .where(and(eq(botPosts.chatId, chatId), eq(botPosts.telegramMessageId, telegramMessageId)));
+}
+
+export async function findBotPost(
+  db: AppDatabase,
+  chatId: number,
+  telegramMessageId: number,
+): Promise<typeof botPosts.$inferSelect | undefined> {
+  return db.query.botPosts.findFirst({
+    where: and(eq(botPosts.chatId, chatId), eq(botPosts.telegramMessageId, telegramMessageId)),
+  });
+}
+
 async function tryDeleteBotPost(
   api: Api,
   db: AppDatabase,

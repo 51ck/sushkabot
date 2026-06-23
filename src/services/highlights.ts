@@ -7,6 +7,10 @@ import type { CheckinStatus } from "../types.ts";
 import { normalizeCheckinStatus, statusToLabel } from "../types.ts";
 import { getRecentChatSnippets } from "./chat-snippets.ts";
 import {
+  buildParticipantRosterStats,
+  type ParticipantRosterEntry,
+} from "./llm-context.ts";
+import {
   type buildMemberStats,
   calculateIntoxStreak,
   calculateSoberStreak,
@@ -35,6 +39,7 @@ export interface WindowHighlightContext {
   highlights: MemberHighlight[];
   chatSnippets: Array<{ authorName: string; text: string }>;
   styleExamples: Array<{ kind: string; text: string }>;
+  participants: ParticipantRosterEntry[];
 }
 
 async function getMemberHistory(
@@ -116,7 +121,8 @@ export async function buildWindowHighlightContext(params: {
       ? allHighlights
       : allHighlights.filter((h) => h.event !== "routine" && h.event !== "extended_sober");
 
-  const chatSnippets = await getRecentChatSnippets(db, chatId, 5);
+  const chatSnippets = await getRecentChatSnippets(db, chatId, env.LLM_CHAT_CONTEXT_COUNT);
+  const participants = await buildParticipantRosterStats(db, chatId, checkinDate);
 
   return {
     checkinDate,
@@ -127,6 +133,7 @@ export async function buildWindowHighlightContext(params: {
     highlights,
     chatSnippets,
     styleExamples,
+    participants,
   };
 }
 

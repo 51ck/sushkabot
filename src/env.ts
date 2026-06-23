@@ -24,6 +24,7 @@ export const env = createEnv({
     STATS_TTL_MINUTES: z.coerce.number().int().positive().default(30),
     HIGHLIGHT_FULL_LIST_MAX: z.coerce.number().int().positive().default(5),
     CHAT_SNIPPET_LIMIT: z.coerce.number().int().positive().default(20),
+    LLM_CHAT_CONTEXT_COUNT: z.coerce.number().int().positive().default(10),
     LLM_STYLE_EXAMPLES: z.coerce.number().int().positive().default(5),
   },
   runtimeEnv: process.env,

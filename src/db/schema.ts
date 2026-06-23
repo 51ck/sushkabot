@@ -91,6 +91,7 @@ export const botPosts = sqliteTable(
     }),
     postedAt: text("posted_at").notNull().default(sql`(datetime('now'))`),
     hasReply: integer("has_reply", { mode: "boolean" }).notNull().default(false),
+    hasReaction: integer("has_reaction", { mode: "boolean" }).notNull().default(false),
     deleteAfter: text("delete_after"),
     deletedAt: text("deleted_at"),
   },

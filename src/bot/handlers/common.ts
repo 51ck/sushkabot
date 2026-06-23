@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 import { env } from "../../env.ts";
 import { trackBotPost } from "../../services/bot-posts.ts";
 import { buildStatsPayload } from "../../services/highlights.ts";
+import { buildLlmBaseContext } from "../../services/llm-context.ts";
 import { formatStatsFallback, generatePersonalStats } from "../../services/llm.ts";
 import { recordLlmGeneration } from "../../services/llm-generations.ts";
 import { ensureMember, getChatByTelegramId } from "../../services/members.ts";
@@ -48,7 +49,8 @@ export function registerCommonHandlers(bot: Bot<BotContext>): void {
     const mention = formatMemberMention(member.username, member.displayName);
     const payload = buildStatsPayload({ mention, checkinDate: today, stats, recentDays });
 
-    const llmText = await generatePersonalStats(payload);
+    const llmCtx = await buildLlmBaseContext(ctx.db, chat.id, today);
+    const llmText = await generatePersonalStats({ ...llmCtx, statsPayload: payload });
     const text = llmText ?? formatStatsFallback(payload);
 
     if (llmText) {

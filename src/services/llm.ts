@@ -4,12 +4,15 @@ import {
   buildStatsUserPrompt,
   LIVE_WINDOW_SYSTEM_PROMPT,
   STATS_SYSTEM_PROMPT,
+  type StatsLlmContext,
 } from "../prompts/live-window.ts";
 import {
   buildCheckinUserPrompt,
   buildSummaryUserPrompt,
   CHECKIN_SYSTEM_PROMPT,
+  type CheckinLlmContext,
   SUMMARY_SYSTEM_PROMPT,
+  type SummaryLlmContext,
 } from "../prompts/messages.ts";
 import { DEFAULT_QUESTION } from "../types.ts";
 import type { WindowHighlightContext } from "./highlights.ts";
@@ -70,29 +73,18 @@ function truncateBody(text: string): string {
   return text.slice(0, 1200);
 }
 
-export async function generateCheckinBody(params: {
-  date: string;
-  answeredCount: number;
-  joinedCount: number;
-}): Promise<string> {
+export async function generateCheckinBody(ctx: CheckinLlmContext): Promise<string> {
   const generated = await chatComplete([
     { role: "system", content: CHECKIN_SYSTEM_PROMPT },
-    { role: "user", content: buildCheckinUserPrompt(params) },
+    { role: "user", content: buildCheckinUserPrompt(ctx) },
   ]);
   return generated ?? DEFAULT_QUESTION;
 }
 
-export async function generateSummaryIntro(params: {
-  date: string;
-  answeredCount: number;
-  joinedCount: number;
-  soberCount: number;
-  minorSlipCount: number;
-  majorSlipCount: number;
-}): Promise<string | null> {
+export async function generateSummaryIntro(ctx: SummaryLlmContext): Promise<string | null> {
   return chatComplete([
     { role: "system", content: SUMMARY_SYSTEM_PROMPT },
-    { role: "user", content: buildSummaryUserPrompt(params) },
+    { role: "user", content: buildSummaryUserPrompt(ctx) },
   ]);
 }
 
@@ -103,12 +95,10 @@ export async function generateLiveWindowBody(ctx: WindowHighlightContext): Promi
   ]);
 }
 
-export async function generatePersonalStats(
-  payload: Record<string, unknown>,
-): Promise<string | null> {
+export async function generatePersonalStats(ctx: StatsLlmContext): Promise<string | null> {
   return chatComplete([
     { role: "system", content: STATS_SYSTEM_PROMPT },
-    { role: "user", content: buildStatsUserPrompt(payload) },
+    { role: "user", content: buildStatsUserPrompt(ctx) },
   ]);
 }
 

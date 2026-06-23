@@ -2,8 +2,9 @@ import { and, eq } from "drizzle-orm";
 import type { Api } from "grammy";
 import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
-import { type Chat, chats, dailyWindows } from "../db/schema.ts";
-import { cleanupStaleBotPosts, trackBotPost } from "./bot-posts.ts";
+import { type Chat, botPosts, chats, dailyWindows } from "../db/schema.ts";
+import { cleanupStaleBotPosts, findBotPost, trackBotPost } from "./bot-posts.ts";
+import { buildLlmBaseContext, shouldDeleteWindowInvitation } from "./llm-context.ts";
 import { generateCheckinBody } from "./llm.ts";
 import { recordLlmGeneration } from "./llm-generations.ts";
 import { countAnswered, countJoinedMembers, recordAbsentAsMinorSlip } from "./members.ts";
@@ -96,7 +97,9 @@ export async function openWindow(params: {
 
     let generatedBody = windowRow.generatedBody;
     if (!generatedBody) {
+      const llmCtx = await buildLlmBaseContext(db, chat.id, windowRow.checkinDate);
       generatedBody = await generateCheckinBody({
+        ...llmCtx,
         date: windowRow.checkinDate,
         answeredCount,
         joinedCount,
@@ -161,22 +164,43 @@ export async function closeWindow(params: {
   const answeredCount = await countAnswered(db, window.id);
   const joinedCount = await countJoinedMembers(db, chat.id);
   const body = window.liveBody ?? window.generatedBody;
-  const { text } = buildWindowMessage({
-    chat,
-    checkinDate: window.checkinDate,
-    answeredCount,
-    joinedCount,
-    closesAt,
-    now: DateTime.utc(),
-    closed: true,
-    generatedBody: body,
-  });
 
   if (window.messageId) {
-    try {
-      await api.editMessageText(Number(chat.telegramChatId), window.messageId, text);
-    } catch {
-      // ignore
+    const post = await findBotPost(db, chat.id, window.messageId);
+    const deleteInvitation = shouldDeleteWindowInvitation(
+      post?.hasReply ?? false,
+      post?.hasReaction ?? false,
+    );
+
+    if (deleteInvitation) {
+      try {
+        await api.deleteMessage(Number(chat.telegramChatId), window.messageId);
+      } catch {
+        // ignore
+      }
+      await db
+        .update(botPosts)
+        .set({ deletedAt: DateTime.utc().toISO() })
+        .where(
+          and(eq(botPosts.chatId, chat.id), eq(botPosts.telegramMessageId, window.messageId)),
+        );
+    } else {
+      const { text } = buildWindowMessage({
+        chat,
+        checkinDate: window.checkinDate,
+        answeredCount,
+        joinedCount,
+        closesAt,
+        now: DateTime.utc(),
+        closed: true,
+        generatedBody: body,
+      });
+
+      try {
+        await api.editMessageText(Number(chat.telegramChatId), window.messageId, text);
+      } catch {
+        // ignore
+      }
     }
   }
 

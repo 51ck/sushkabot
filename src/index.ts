@@ -32,6 +32,13 @@ async function main() {
 
   console.info(`Sushkabot starting (${env.BOT_ENV})`);
   await bot.start({
+    allowed_updates: [
+      "message",
+      "callback_query",
+      "my_chat_member",
+      "message_reaction",
+      "message_reaction_count",
+    ],
     onStart: async (info) => {
       console.info(`Logged in as @${info.username}`);
       await registerBotCommands(bot.api);
