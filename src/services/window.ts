@@ -8,6 +8,7 @@ import { generateCheckinBody, isLlmFallbackText } from "./llm.ts";
 import { buildLlmBaseContext, shouldDeleteWindowInvitation } from "./llm-context.ts";
 import { recordLlmGeneration } from "./llm-generations.ts";
 import { countAnswered, countJoinedMembers, recordAbsentAsMinorSlip } from "./members.ts";
+import { postMilestoneCelebrations } from "./milestone.ts";
 import type { SchedulerService } from "./scheduler.ts";
 import { postSummary } from "./summary.ts";
 import { buildWindowMessage, computeCheckinDate, computeWindowClose } from "./window-message.ts";
@@ -240,6 +241,7 @@ export async function closeWindow(params: {
 
   const closedWindow = { ...window, status: "closed" as const };
   await postSummary({ db, api, chat, window: closedWindow });
+  await postMilestoneCelebrations({ db, api, chat, window: closedWindow });
 
   await db.update(dailyWindows).set({ status: "summarized" }).where(eq(dailyWindows.id, window.id));
 }
