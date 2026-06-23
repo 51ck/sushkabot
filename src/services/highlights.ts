@@ -134,6 +134,22 @@ export async function buildWindowHighlightContext(params: {
   };
 }
 
+/** Human-readable highlights for live-window LLM prompt. */
+export function formatHighlightsBlock(highlights: MemberHighlight[]): string {
+  if (highlights.length === 0) return "(пока никто не ответил)";
+
+  return highlights
+    .map((h) => {
+      const streak =
+        h.soberStreakBefore !== h.soberStreakAfter
+          ? `трезвость ${h.soberStreakBefore}→${h.soberStreakAfter}`
+          : `трезвость ${h.soberStreakAfter}`;
+      const intox = h.intoxStreakAfter > 0 ? `, срыв ${h.intoxStreakAfter}` : "";
+      return `- ${h.mention}: ${h.statusLabel}, ${streak}${intox}, event=${h.event}`;
+    })
+    .join("\n");
+}
+
 export function buildStatsPayload(params: {
   mention: string;
   checkinDate: string;

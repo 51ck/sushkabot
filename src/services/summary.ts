@@ -1,20 +1,14 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { Api } from "grammy";
 import type { AppDatabase } from "../db/client.ts";
-import { type Chat, chatMembers, checkins, dailyWindows, members } from "../db/schema.ts";
-import {
-  type CheckinStatus,
-  normalizeCheckinStatus,
-  statusToEmoji,
-  statusToLabel,
-} from "../types.ts";
+import { type Chat, chatMembers, checkins, dailyWindows } from "../db/schema.ts";
+import { type CheckinStatus, normalizeCheckinStatus } from "../types.ts";
 import { trackBotPost } from "./bot-posts.ts";
 import { generateSummaryIntro } from "./llm.ts";
 import { buildLlmBaseContext } from "./llm-context.ts";
 import { recordLlmGeneration } from "./llm-generations.ts";
 import { countAnswered, countJoinedMembers } from "./members.ts";
-import { calculateIntoxStreak, calculateSoberStreak, formatDualStreak } from "./streak.ts";
-import { buildSummaryMessage, formatMemberMention } from "./window-message.ts";
+import { buildSummaryMessage } from "./window-message.ts";
 
 export async function postSummary(params: {
   db: AppDatabase;
@@ -27,13 +21,8 @@ export async function postSummary(params: {
   if (window.status === "summarized") return;
 
   const joined = await db
-    .select({
-      memberId: chatMembers.memberId,
-      username: members.username,
-      displayName: members.displayName,
-    })
+    .select({ memberId: chatMembers.memberId })
     .from(chatMembers)
-    .innerJoin(members, eq(chatMembers.memberId, members.id))
     .where(and(eq(chatMembers.chatId, chat.id), eq(chatMembers.active, true)));
 
   const windowCheckins = await db.query.checkins.findMany({
@@ -41,31 +30,18 @@ export async function postSummary(params: {
   });
   const checkinByMember = new Map(windowCheckins.map((c) => [c.memberId, c]));
 
-  const summaryLines: string[] = [];
   let soberCount = 0;
   let minorSlipCount = 0;
   let majorSlipCount = 0;
 
   for (const member of joined) {
     const checkin = checkinByMember.get(member.memberId);
-    const mention = formatMemberMention(member.username, member.displayName);
-
-    if (!checkin) {
-      summaryLines.push(`⏳ ${mention} — нет данных`);
-      continue;
-    }
+    if (!checkin) continue;
 
     const status = normalizeCheckinStatus(checkin.status);
     if (status === "sober") soberCount += 1;
     else if (status === "minor_slip") minorSlipCount += 1;
     else majorSlipCount += 1;
-
-    const history = await getMemberCheckinHistory(db, chat.id, member.memberId, window.checkinDate);
-    const sober = calculateSoberStreak(history, window.checkinDate);
-    const intox = calculateIntoxStreak(history, window.checkinDate);
-    const emoji = statusToEmoji(status);
-    const label = statusToLabel(status);
-    summaryLines.push(`${emoji} ${mention} — ${label}, ${formatDualStreak(sober, intox)}`);
   }
 
   const joinedCount = await countJoinedMembers(db, chat.id);
@@ -94,10 +70,7 @@ export async function postSummary(params: {
 
   const text = buildSummaryMessage({
     checkinDate: window.checkinDate,
-    joinedCount,
-    answeredCount,
     intro,
-    lines: summaryLines,
   });
 
   const message = await api.sendMessage(Number(chat.telegramChatId), text);

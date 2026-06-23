@@ -6,6 +6,7 @@ import {
   computeCheckinDate,
   computeWindowClose,
   formatCountdown,
+  sanitizeWindowBody,
 } from "../../src/services/window-message.ts";
 
 const baseChat: Chat = {
@@ -16,12 +17,21 @@ const baseChat: Chat = {
   checkinHour: 23,
   checkinMinute: 0,
   windowDurationMinutes: 120,
-  questionText: "Оступился? Пидорнулся?",
+  questionText: "FALLBACK_BODY",
   responseMode: "sushka",
   buttonLabels: null,
   nudgeEnabled: false,
   enabled: true,
   createdAt: "2026-01-01",
+};
+
+const openParams = {
+  chat: baseChat,
+  checkinDate: "2026-05-26",
+  answeredCount: 3,
+  joinedCount: 7,
+  closesAt: DateTime.fromISO("2026-05-27T01:00:00", { zone: "Europe/Moscow" }),
+  now: DateTime.fromISO("2026-05-26T23:00:00", { zone: "Europe/Moscow" }),
 };
 
 describe("window math", () => {
@@ -43,45 +53,40 @@ describe("window math", () => {
   });
 });
 
-describe("buildWindowMessage", () => {
-  test("includes progress counter", () => {
-    const { text } = buildWindowMessage({
-      chat: baseChat,
-      checkinDate: "2026-05-26",
-      answeredCount: 3,
-      joinedCount: 7,
-      closesAt: DateTime.fromISO("2026-05-27T01:00:00", { zone: "Europe/Moscow" }),
-      now: DateTime.fromISO("2026-05-26T23:00:00", { zone: "Europe/Moscow" }),
-    });
-    expect(text).toContain("3/7 ответили");
-    expect(text).toContain("Оступился? Пидорнулся?");
-    expect(text).toContain("🌙 Сушка");
+describe("buildWindowMessage structure", () => {
+  test("open message: body first, footer counter, no date header line", () => {
+    const body = "LLM_BODY_MARKER";
+    const { text, replyMarkup } = buildWindowMessage({ ...openParams, generatedBody: body });
+
+    const lines = text.split("\n");
+    expect(lines[0]).toBe(body);
+    expect(lines.some((l) => l.startsWith("🌙"))).toBe(false);
+    expect(text).toMatch(/⏱.*3\/7 ответили/);
+    expect(replyMarkup).toBeDefined();
   });
 
-  test("uses generated body when provided", () => {
-    const { text } = buildWindowMessage({
-      chat: baseChat,
-      checkinDate: "2026-05-26",
-      answeredCount: 1,
-      joinedCount: 2,
-      closesAt: DateTime.fromISO("2026-05-27T01:00:00Z"),
-      now: DateTime.fromISO("2026-05-26T23:00:00Z"),
-      generatedBody: "Ну что, честно?",
-    });
-    expect(text).toContain("Ну что, честно?");
+  test("falls back to chat.questionText when no generated body", () => {
+    const { text } = buildWindowMessage(openParams);
+    expect(text.startsWith("FALLBACK_BODY")).toBe(true);
   });
 
-  test("closed message has no keyboard", () => {
+  test("closed message has no keyboard and replaces footer", () => {
     const { text, replyMarkup } = buildWindowMessage({
-      chat: baseChat,
-      checkinDate: "2026-05-26",
-      answeredCount: 1,
-      joinedCount: 2,
-      closesAt: DateTime.fromISO("2026-05-27T01:00:00Z"),
+      ...openParams,
       now: DateTime.fromISO("2026-05-27T02:00:00Z"),
       closed: true,
+      generatedBody: "LLM_BODY_MARKER",
     });
-    expect(text).toContain("Окно закрыто");
+
+    expect(text).toMatch(/^LLM_BODY_MARKER\n\nОкно закрыто\.$/);
+    expect(text).not.toMatch(/⏱.*ответили/);
     expect(replyMarkup).toBeUndefined();
+  });
+});
+
+describe("sanitizeWindowBody", () => {
+  test("strips echoed template chrome, keeps body", () => {
+    const raw = "🌙 Сушка · 23 июня\n\nBODY_KEEP\n\n⏱ до 21:00 (2ч) · 1/2 ответили";
+    expect(sanitizeWindowBody(raw)).toBe("BODY_KEEP");
   });
 });
