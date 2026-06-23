@@ -57,19 +57,10 @@ export function buildWindowMessage(params: {
 
 export function buildSummaryMessage(params: {
   checkinDate: string;
-  joinedCount: number;
-  answeredCount: number;
   intro?: string | null;
-  lines: string[];
 }): string {
   const dateLabel = DateTime.fromISO(params.checkinDate).setLocale("ru").toFormat("d MMMM");
-  const header = params.intro?.trim() || `📊 Итоги · ${dateLabel}`;
-  return [
-    header,
-    "",
-    `Ответили: ${params.answeredCount}/${params.joinedCount}`,
-    ...params.lines,
-  ].join("\n");
+  return params.intro?.trim() || `📊 Итоги · ${dateLabel}`;
 }
 
 export function formatMemberMention(username: string | null, displayName: string): string {

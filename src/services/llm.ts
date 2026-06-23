@@ -93,21 +93,29 @@ export function buildLlmRequestPayload(
   return payload;
 }
 
-async function chatComplete(messages: ChatMessage[]): Promise<string | null> {
+async function chatComplete(messages: ChatMessage[], label: string): Promise<string | null> {
   if (!env.OPENAI_API_KEY) return null;
 
   const base = normalizeApiBase(env.OPENAI_API_BASE);
+  const payload = buildLlmRequestPayload(messages);
+  const url = `${base}/chat/completions`;
+
+  if (env.LOG_LEVEL === "debug") {
+    console.debug(`LLM → ${label}`, url);
+    console.debug(`LLM → ${label} payload:\n${JSON.stringify(payload, null, 2)}`);
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${base}/chat/completions`, {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${env.OPENAI_API_KEY}`,
       },
-      body: JSON.stringify(buildLlmRequestPayload(messages)),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
 
@@ -119,9 +127,16 @@ async function chatComplete(messages: ChatMessage[]): Promise<string | null> {
 
     const data = (await response.json()) as ChatCompletionResponse;
     const text = extractCompletionText(data);
-    if (!text && isDevEnv()) {
+
+    if (env.LOG_LEVEL === "debug") {
+      console.debug(`LLM ← ${label}:`, text ?? "(empty)");
+      if (!text) {
+        console.debug(`LLM ← ${label} raw:`, JSON.stringify(data).slice(0, 2000));
+      }
+    } else if (!text && isDevEnv()) {
       console.warn("LLM response had no usable content", JSON.stringify(data).slice(0, 400));
     }
+
     return text;
   } catch (error) {
     console.warn("LLM request error:", error);
@@ -132,10 +147,13 @@ async function chatComplete(messages: ChatMessage[]): Promise<string | null> {
 }
 
 export async function generateCheckinBody(ctx: CheckinLlmContext): Promise<string> {
-  const generated = await chatComplete([
-    { role: "system", content: CHECKIN_SYSTEM_PROMPT },
-    { role: "user", content: buildCheckinUserPrompt(ctx) },
-  ]);
+  const generated = await chatComplete(
+    [
+      { role: "system", content: CHECKIN_SYSTEM_PROMPT },
+      { role: "user", content: buildCheckinUserPrompt(ctx) },
+    ],
+    "open",
+  );
   return generated ?? DEFAULT_QUESTION;
 }
 
@@ -144,24 +162,33 @@ export function isLlmFallbackText(text: string): boolean {
 }
 
 export async function generateSummaryIntro(ctx: SummaryLlmContext): Promise<string | null> {
-  return chatComplete([
-    { role: "system", content: SUMMARY_SYSTEM_PROMPT },
-    { role: "user", content: buildSummaryUserPrompt(ctx) },
-  ]);
+  return chatComplete(
+    [
+      { role: "system", content: SUMMARY_SYSTEM_PROMPT },
+      { role: "user", content: buildSummaryUserPrompt(ctx) },
+    ],
+    "summary",
+  );
 }
 
 export async function generateLiveWindowBody(ctx: WindowHighlightContext): Promise<string | null> {
-  return chatComplete([
-    { role: "system", content: LIVE_WINDOW_SYSTEM_PROMPT },
-    { role: "user", content: buildLiveWindowUserPrompt(ctx) },
-  ]);
+  return chatComplete(
+    [
+      { role: "system", content: LIVE_WINDOW_SYSTEM_PROMPT },
+      { role: "user", content: buildLiveWindowUserPrompt(ctx) },
+    ],
+    "live",
+  );
 }
 
 export async function generatePersonalStats(ctx: StatsLlmContext): Promise<string | null> {
-  return chatComplete([
-    { role: "system", content: STATS_SYSTEM_PROMPT },
-    { role: "user", content: buildStatsUserPrompt(ctx) },
-  ]);
+  return chatComplete(
+    [
+      { role: "system", content: STATS_SYSTEM_PROMPT },
+      { role: "user", content: buildStatsUserPrompt(ctx) },
+    ],
+    "stats",
+  );
 }
 
 export function formatStatsFallback(payload: Record<string, unknown>): string {

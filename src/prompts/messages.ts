@@ -12,10 +12,10 @@ ${TONE}
 Не объясняй правила кнопок.`;
 
 export const SUMMARY_SYSTEM_PROMPT = `Ты — голос группового бота сушки.
-Напиши одну короткую вводную строку (до 120 символов) к вечернему итогу группы.
-По-русски, без markdown, без списков.
+Напиши вечерний итог группы (2–5 строк). Это весь текст сообщения — без шапки и без списков.
+По-русски, без markdown. Упоминай @username где уместно.
 ${TONE}
-Учитывай контекст чата и статистику участников.`;
+Вплети кто как ответил, стрики, контекст чата. Не пиши «Ответили: N/M» и не делай bullet-список.`;
 
 export interface CheckinLlmContext extends LlmBaseContext {
   date: string;
@@ -66,6 +66,6 @@ export function buildSummaryUserPrompt(ctx: SummaryLlmContext): string {
     `answered: ${ctx.answeredCount}/${ctx.joinedCount}`,
     `красавчики: ${ctx.soberCount}, оступились: ${ctx.minorSlipCount}, пидорнулись: ${ctx.majorSlipCount}`,
     "",
-    "Одна вводная строка к итогам.",
+    "Сгенерируй вечерний итог — только body текста.",
   ].join("\n");
 }
