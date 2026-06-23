@@ -1,6 +1,6 @@
 # Sushkabot — Product & Technical Spec
 
-**Version:** 0.5.0 | **Status:** living doc, matches `src/` June 2026 | **Audience:** devs, ops, contributors
+**Version:** 0.5.1 | **Status:** living doc, matches `src/` June 2026 | **Audience:** devs, ops, contributors
 
 ### Revision history
 
@@ -11,6 +11,7 @@
 | 0.3.0 | GHCR deploy pipeline; production Compose pull-only; VPS bootstrap script; `.dockerignore` |
 | 0.4.0 | Fixed Sushka buttons; dual sober/intox streaks; LLM window/summary/stats; live window regen; chat cleanup (`bot_posts`); `/stats` ephemeral |
 | 0.5.0 | Shared LLM context (chat + roster) on all generations; lively/sarcastic tone; summary = LLM body only; delete silent window invites on close; reaction tracking; DeepSeek thinking disabled; debug LLM logs |
+| 0.5.1 | `/stats` = LLM-only posted text (readable stats block in prompt); template fallback only when LLM off/fails |
 
 ---
 
@@ -378,7 +379,14 @@ Buttons removed. No LLM call on close edit.
 
 **Delivery:** Reply in group (visible to all).
 
-**Content:** LLM personal text (`generatePersonalStats`, kind `stats`) or `formatStatsFallback` with numeric streaks.
+**Content:** LLM personal text (`generatePersonalStats`, kind `stats`) — entire posted message, no `📊 Статистика · @user` header. `formatStatsFallback` only when `OPENAI_API_KEY` unset or request fails.
+
+**Stats LLM** (`generatePersonalStats`, kind `stats`):
+
+- System: `STATS_SYSTEM_PROMPT` — `src/prompts/live-window.ts`
+- Input: shared context + readable stats block (`formatStatsBlock`: mention, streaks, totals, last 7 days)
+- Output: 3–6 lines — weave numbers naturally; compare with roster; no markdown lists
+- `sanitizeStatsBody` strips echoed template chrome if model adds it
 
 **Input:** shared context + personal payload (`@mention`, streaks, last 7 days).
 

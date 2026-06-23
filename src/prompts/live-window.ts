@@ -1,5 +1,5 @@
-import type { WindowHighlightContext } from "../services/highlights.ts";
-import { formatHighlightsBlock } from "../services/highlights.ts";
+import type { StatsPromptPayload, WindowHighlightContext } from "../services/highlights.ts";
+import { formatHighlightsBlock, formatStatsBlock } from "../services/highlights.ts";
 import type { LlmBaseContext } from "../services/llm-context.ts";
 import { formatChatBlock, formatRosterBlock, formatStyleBlock } from "../services/llm-context.ts";
 
@@ -16,11 +16,12 @@ ${TONE}
 Копируй тон из «Примеры прошлых генераций», не повторяй дословно.
 Не объясняй правила кнопок. Только body — без «🌙 Сушка · дата», без «⏱ до… ответили».`;
 
-export const STATS_SYSTEM_PROMPT = `Ты — голос бота сушки. Напиши короткий персональный текст статистики (3–6 строк).
+export const STATS_SYSTEM_PROMPT = `Ты — голос бота сушки.
+Напиши персональную статистику (3–6 строк). Это весь текст сообщения — без шапки «📊 Статистика» и без сухих bullet-списков.
 По-русски, без markdown. Упомяни @username.
-Включи текущие и максимальные стрики трезвости и срыва, общие дни, последние 7 дней одной фразой.
+Вплети стрики, общие дни и последнюю неделю — числа из блока статистики, но своими словами.
 ${TONE}
-Учитывай контекст чата и статистику других участников для сравнения или подкола.`;
+Сравни с другими участниками или подколи, если уместно.`;
 
 export function buildLiveWindowUserPrompt(ctx: WindowHighlightContext): string {
   return [
@@ -47,7 +48,7 @@ export function buildLiveWindowUserPrompt(ctx: WindowHighlightContext): string {
 }
 
 export interface StatsLlmContext extends LlmBaseContext {
-  statsPayload: Record<string, unknown>;
+  statsPayload: StatsPromptPayload;
 }
 
 export function buildStatsUserPrompt(ctx: StatsLlmContext): string {
@@ -61,9 +62,9 @@ export function buildStatsUserPrompt(ctx: StatsLlmContext): string {
     "## Участники",
     formatRosterBlock(ctx.participants),
     "",
-    "## Персональная статистика",
-    JSON.stringify(ctx.statsPayload, null, 2),
+    "## Статистика",
+    formatStatsBlock(ctx.statsPayload),
     "",
-    "Сгенерируй персональную статистику.",
+    "Сгенерируй персональную статистику — только текст сообщения.",
   ].join("\n");
 }

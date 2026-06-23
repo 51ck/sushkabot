@@ -150,12 +150,24 @@ export function formatHighlightsBlock(highlights: MemberHighlight[]): string {
     .join("\n");
 }
 
+export interface StatsPromptPayload {
+  mention: string;
+  asOfDate: string;
+  soberCurrent: number;
+  soberMax: number;
+  intoxCurrent: number;
+  intoxMax: number;
+  totalSoberDays: number;
+  totalSlipDays: number;
+  recentDays: Array<{ date: string; status: string }>;
+}
+
 export function buildStatsPayload(params: {
   mention: string;
   checkinDate: string;
   stats: ReturnType<typeof buildMemberStats>;
   recentDays: Array<{ date: string; status: CheckinStatus }>;
-}): Record<string, unknown> {
+}): StatsPromptPayload {
   return {
     mention: params.mention,
     asOfDate: params.checkinDate,
@@ -170,4 +182,22 @@ export function buildStatsPayload(params: {
       status: statusToLabel(d.status),
     })),
   };
+}
+
+/** Human-readable personal stats for /stats LLM prompt. */
+export function formatStatsBlock(payload: StatsPromptPayload): string {
+  const recent =
+    payload.recentDays.length === 0
+      ? "(нет отметок за 7 дней)"
+      : payload.recentDays.map((d) => `- ${d.date}: ${d.status}`).join("\n");
+
+  return [
+    `Участник: ${payload.mention}`,
+    `На дату: ${payload.asOfDate}`,
+    `Стрик трезвости: ${payload.soberCurrent} (макс ${payload.soberMax})`,
+    `Стрик срыва: ${payload.intoxCurrent} (макс ${payload.intoxMax})`,
+    `Всего: ${payload.totalSoberDays} трезвых / ${payload.totalSlipDays} срывных дней`,
+    "Последние 7 дней:",
+    recent,
+  ].join("\n");
 }

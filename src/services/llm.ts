@@ -15,7 +15,7 @@ import {
   type SummaryLlmContext,
 } from "../prompts/messages.ts";
 import { DEFAULT_QUESTION } from "../types.ts";
-import type { WindowHighlightContext } from "./highlights.ts";
+import type { StatsPromptPayload, WindowHighlightContext } from "./highlights.ts";
 
 const REQUEST_TIMEOUT_MS = 8000;
 const MAX_COMPLETION_TOKENS = 1024;
@@ -182,19 +182,29 @@ export async function generateLiveWindowBody(ctx: WindowHighlightContext): Promi
 }
 
 export async function generatePersonalStats(ctx: StatsLlmContext): Promise<string | null> {
-  return chatComplete(
+  const generated = await chatComplete(
     [
       { role: "system", content: STATS_SYSTEM_PROMPT },
       { role: "user", content: buildStatsUserPrompt(ctx) },
     ],
     "stats",
   );
+  return generated ? sanitizeStatsBody(generated) : null;
 }
 
-export function formatStatsFallback(payload: Record<string, unknown>): string {
-  const mention = String(payload.mention ?? "ты");
+/** Strip template chrome if LLM echoed the old /stats layout. */
+export function sanitizeStatsBody(text: string): string {
+  let body = text.trim();
+  body = body.replace(/^📊\s*Статистика\s*·[^\n]*\n*/m, "");
+  body = body.replace(/^Трезвость:\s*\d+[^\n]*\n/m, "");
+  body = body.replace(/^Срыв:\s*\d+[^\n]*\n/m, "");
+  body = body.replace(/^Всего:\s*\d+[^\n]*\n?/m, "");
+  return body.trim();
+}
+
+export function formatStatsFallback(payload: StatsPromptPayload): string {
   return [
-    `📊 Статистика · ${mention}`,
+    `📊 Статистика · ${payload.mention}`,
     "",
     `Трезвость: ${payload.soberCurrent} (макс ${payload.soberMax})`,
     `Срыв: ${payload.intoxCurrent} (макс ${payload.intoxMax})`,
