@@ -9,8 +9,8 @@ import {
   statusToLabel,
 } from "../types.ts";
 import { trackBotPost } from "./bot-posts.ts";
-import { buildLlmBaseContext } from "./llm-context.ts";
 import { generateSummaryIntro } from "./llm.ts";
+import { buildLlmBaseContext } from "./llm-context.ts";
 import { recordLlmGeneration } from "./llm-generations.ts";
 import { countAnswered, countJoinedMembers } from "./members.ts";
 import { calculateIntoxStreak, calculateSoberStreak, formatDualStreak } from "./streak.ts";

@@ -18,15 +18,17 @@ describe("buildParticipantRosterStats", () => {
         windowDurationMinutes: 120,
       })
       .returning();
+    if (!chat) throw new Error("expected chat row");
 
     const [member] = await db
       .insert(members)
       .values({ telegramUserId: "42", username: "alice", displayName: "Alice" })
       .returning();
+    if (!member) throw new Error("expected member row");
 
-    await db.insert(chatMembers).values({ chatId: chat!.id, memberId: member!.id, active: true });
+    await db.insert(chatMembers).values({ chatId: chat.id, memberId: member.id, active: true });
 
-    const roster = await buildParticipantRosterStats(db, chat!.id, "2026-06-23");
+    const roster = await buildParticipantRosterStats(db, chat.id, "2026-06-23");
     expect(roster).toHaveLength(1);
     expect(roster[0]?.mention).toBe("@alice");
     expect(roster[0]?.soberCurrent).toBe(0);

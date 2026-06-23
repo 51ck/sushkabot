@@ -6,10 +6,7 @@ import { env } from "../env.ts";
 import type { CheckinStatus } from "../types.ts";
 import { normalizeCheckinStatus, statusToLabel } from "../types.ts";
 import { getRecentChatSnippets } from "./chat-snippets.ts";
-import {
-  buildParticipantRosterStats,
-  type ParticipantRosterEntry,
-} from "./llm-context.ts";
+import { buildParticipantRosterStats, type ParticipantRosterEntry } from "./llm-context.ts";
 import {
   type buildMemberStats,
   calculateIntoxStreak,

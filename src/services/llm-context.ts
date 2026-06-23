@@ -4,8 +4,8 @@ import { chatMembers, members } from "../db/schema.ts";
 import { env } from "../env.ts";
 import { getRecentChatSnippets } from "./chat-snippets.ts";
 import { getRecentLlmGenerations } from "./llm-generations.ts";
-import { getMemberCheckinHistory } from "./summary.ts";
 import { buildMemberStats } from "./streak.ts";
+import { getMemberCheckinHistory } from "./summary.ts";
 import { formatMemberMention } from "./window-message.ts";
 
 export interface ParticipantRosterEntry {
