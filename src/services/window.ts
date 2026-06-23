@@ -4,7 +4,7 @@ import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
 import { botPosts, type Chat, chats, dailyWindows } from "../db/schema.ts";
 import { cleanupStaleBotPosts, findBotPost, trackBotPost } from "./bot-posts.ts";
-import { generateCheckinBody } from "./llm.ts";
+import { generateCheckinBody, isLlmFallbackText } from "./llm.ts";
 import { buildLlmBaseContext, shouldDeleteWindowInvitation } from "./llm-context.ts";
 import { recordLlmGeneration } from "./llm-generations.ts";
 import { countAnswered, countJoinedMembers, recordAbsentAsMinorSlip } from "./members.ts";
@@ -33,7 +33,7 @@ export async function openWindow(params: {
   });
 
   if (existing) {
-    if (existing.status === "open" && existing.messageId) {
+    if (existing.status === "open" && existing.messageId && !params.force) {
       return existing;
     }
     if (existing.status !== "open" && !params.force) {
@@ -91,7 +91,29 @@ export async function openWindow(params: {
     windowRow = row;
   }
 
-  if (!windowRow.messageId) {
+  const forceRegenerate =
+    Boolean(params.force) && windowRow.status === "open" && Boolean(windowRow.messageId);
+
+  if (forceRegenerate) {
+    await db
+      .update(dailyWindows)
+      .set({
+        generatedBody: null,
+        liveBody: null,
+        liveBodyAt: null,
+        windowOpensAt: toIso(opensAt),
+        windowClosesAt: toIso(closesAt),
+      })
+      .where(eq(dailyWindows.id, windowRow.id));
+    windowRow = {
+      ...windowRow,
+      generatedBody: null,
+      liveBody: null,
+      liveBodyAt: null,
+    };
+  }
+
+  if (!windowRow.messageId || forceRegenerate) {
     const answeredCount = await countAnswered(db, windowRow.id);
     const joinedCount = await countJoinedMembers(db, chat.id);
 
@@ -105,7 +127,9 @@ export async function openWindow(params: {
         joinedCount,
       });
       await db.update(dailyWindows).set({ generatedBody }).where(eq(dailyWindows.id, windowRow.id));
-      await recordLlmGeneration({ db, chatId: chat.id, kind: "open", text: generatedBody });
+      if (!isLlmFallbackText(generatedBody)) {
+        await recordLlmGeneration({ db, chatId: chat.id, kind: "open", text: generatedBody });
+      }
       windowRow = { ...windowRow, generatedBody };
     }
 
@@ -119,24 +143,34 @@ export async function openWindow(params: {
       generatedBody,
     });
 
-    const message = await api.sendMessage(Number(chat.telegramChatId), text, {
-      reply_markup: replyMarkup,
-    });
+    if (!windowRow.messageId) {
+      const message = await api.sendMessage(Number(chat.telegramChatId), text, {
+        reply_markup: replyMarkup,
+      });
 
-    await db
-      .update(dailyWindows)
-      .set({ messageId: message.message_id })
-      .where(eq(dailyWindows.id, windowRow.id));
+      await db
+        .update(dailyWindows)
+        .set({ messageId: message.message_id })
+        .where(eq(dailyWindows.id, windowRow.id));
 
-    await trackBotPost({
-      db,
-      chatId: chat.id,
-      telegramMessageId: message.message_id,
-      kind: "window",
-      dailyWindowId: windowRow.id,
-    });
+      await trackBotPost({
+        db,
+        chatId: chat.id,
+        telegramMessageId: message.message_id,
+        kind: "window",
+        dailyWindowId: windowRow.id,
+      });
 
-    windowRow = { ...windowRow, messageId: message.message_id };
+      windowRow = { ...windowRow, messageId: message.message_id };
+    } else {
+      try {
+        await api.editMessageText(Number(chat.telegramChatId), windowRow.messageId, text, {
+          reply_markup: replyMarkup,
+        });
+      } catch {
+        // ignore
+      }
+    }
   }
 
   scheduler.scheduleClose(chat, windowRow);

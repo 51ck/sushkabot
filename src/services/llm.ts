@@ -1,4 +1,4 @@
-import { env } from "../env.ts";
+import { env, isDevEnv } from "../env.ts";
 import {
   buildLiveWindowUserPrompt,
   buildStatsUserPrompt,
@@ -18,13 +18,22 @@ import { DEFAULT_QUESTION } from "../types.ts";
 import type { WindowHighlightContext } from "./highlights.ts";
 
 const REQUEST_TIMEOUT_MS = 8000;
+const MAX_COMPLETION_TOKENS = 512;
 
 export function isLlmEnabled(): boolean {
   return Boolean(env.OPENAI_API_KEY);
 }
 
+interface CompletionMessage {
+  content?: string | null;
+  reasoning_content?: string | null;
+}
+
 interface ChatCompletionResponse {
-  choices?: Array<{ message?: { content?: string } }>;
+  choices?: Array<{
+    message?: CompletionMessage;
+    finish_reason?: string;
+  }>;
 }
 
 interface ChatMessage {
@@ -32,10 +41,51 @@ interface ChatMessage {
   content: string;
 }
 
+export function normalizeApiBase(base: string): string {
+  const trimmed = base.replace(/\/$/, "");
+  if (trimmed.endsWith("/v1")) return trimmed;
+  return `${trimmed}/v1`;
+}
+
+/** Prefer final answer; ignore reasoning trace (not user-facing copy). */
+export function extractCompletionText(data: ChatCompletionResponse): string | null {
+  const choice = data.choices?.[0];
+  const text = choice?.message?.content?.trim();
+  if (text) return truncateBody(text);
+
+  const finishReason = choice?.finish_reason;
+  if (finishReason === "length") {
+    console.warn(
+      "LLM returned empty content (finish_reason=length). " +
+        "Reasoning models may need thinking disabled or higher max_tokens.",
+    );
+  }
+
+  return null;
+}
+
+function truncateBody(text: string): string {
+  const parts = text.split("\n\n");
+  if (parts.length > 6) return parts.slice(0, 6).join("\n\n");
+  return text.slice(0, 1200);
+}
+
+function buildCompletionPayload(messages: ChatMessage[]): Record<string, unknown> {
+  return {
+    model: env.OPENAI_MODEL,
+    temperature: 0.9,
+    max_tokens: MAX_COMPLETION_TOKENS,
+    messages,
+    // DeepSeek V4 enables thinking by default; it can consume the whole budget
+    // and leave content empty on short copy tasks.
+    extra_body: { thinking: { type: "disabled" } },
+  };
+}
+
 async function chatComplete(messages: ChatMessage[]): Promise<string | null> {
   if (!env.OPENAI_API_KEY) return null;
 
-  const base = env.OPENAI_API_BASE.replace(/\/$/, "");
+  const base = normalizeApiBase(env.OPENAI_API_BASE);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -46,31 +96,28 @@ async function chatComplete(messages: ChatMessage[]): Promise<string | null> {
         "Content-Type": "application/json",
         Authorization: `Bearer ${env.OPENAI_API_KEY}`,
       },
-      body: JSON.stringify({
-        model: env.OPENAI_MODEL,
-        temperature: 0.9,
-        max_tokens: 250,
-        messages,
-      }),
+      body: JSON.stringify(buildCompletionPayload(messages)),
       signal: controller.signal,
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const errBody = await response.text();
+      console.warn(`LLM request failed (${response.status}): ${errBody.slice(0, 300)}`);
+      return null;
+    }
 
     const data = (await response.json()) as ChatCompletionResponse;
-    const text = data.choices?.[0]?.message?.content?.trim();
-    return text ? truncateBody(text) : null;
-  } catch {
+    const text = extractCompletionText(data);
+    if (!text && isDevEnv()) {
+      console.warn("LLM response had no usable content", JSON.stringify(data).slice(0, 400));
+    }
+    return text;
+  } catch (error) {
+    console.warn("LLM request error:", error);
     return null;
   } finally {
     clearTimeout(timer);
   }
-}
-
-function truncateBody(text: string): string {
-  const parts = text.split("\n\n");
-  if (parts.length > 6) return parts.slice(0, 6).join("\n\n");
-  return text.slice(0, 1200);
 }
 
 export async function generateCheckinBody(ctx: CheckinLlmContext): Promise<string> {
@@ -79,6 +126,10 @@ export async function generateCheckinBody(ctx: CheckinLlmContext): Promise<strin
     { role: "user", content: buildCheckinUserPrompt(ctx) },
   ]);
   return generated ?? DEFAULT_QUESTION;
+}
+
+export function isLlmFallbackText(text: string): boolean {
+  return text.trim() === DEFAULT_QUESTION;
 }
 
 export async function generateSummaryIntro(ctx: SummaryLlmContext): Promise<string | null> {
