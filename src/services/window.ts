@@ -241,7 +241,11 @@ export async function closeWindow(params: {
 
   const closedWindow = { ...window, status: "closed" as const };
   await postSummary({ db, api, chat, window: closedWindow });
-  await postMilestoneCelebrations({ db, api, chat, window: closedWindow });
+  try {
+    await postMilestoneCelebrations({ db, api, chat, window: closedWindow });
+  } catch (err) {
+    console.error(`Milestone celebration failed for chat ${chat.id}:`, err);
+  }
 
   await db.update(dailyWindows).set({ status: "summarized" }).where(eq(dailyWindows.id, window.id));
 }

@@ -18,6 +18,13 @@ function getPledgeKey(chatId: number, date: string): string {
   return `${chatId}:${date}`;
 }
 
+export function cleanupOldPledges(currentDate: string): void {
+  for (const key of pledgedToday.keys()) {
+    const keyDate = key.split(":")[1];
+    if (keyDate && keyDate < currentDate) pledgedToday.delete(key);
+  }
+}
+
 export function hasPledgedToday(chatId: number, memberId: number, date: string): boolean {
   const key = getPledgeKey(chatId, date);
   return pledgedToday.get(key)?.has(memberId) ?? false;

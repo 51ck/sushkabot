@@ -6,6 +6,7 @@ import type { AppDatabase } from "../db/client.ts";
 import { type Chat, chats, type DailyWindow, dailyWindows } from "../db/schema.ts";
 import { cleanupExpiredBotPosts } from "./bot-posts.ts";
 import { sendNudge } from "./nudge.ts";
+import { cleanupOldPledges } from "./pledge.ts";
 import { closeWindow, openWindow, recoverStaleWindows } from "./window.ts";
 
 type CloseTimer = ReturnType<typeof setTimeout>;
@@ -38,6 +39,7 @@ export class SchedulerService {
 
     this.maintenanceCron = new Cron("* * * * *", { protect: true }, async () => {
       await cleanupExpiredBotPosts({ db: this.db, api: this.getApi() });
+      cleanupOldPledges(DateTime.utc().toISODate() ?? "");
     });
   }
 
@@ -113,15 +115,24 @@ export class SchedulerService {
       const nudgeDelayMs = Math.max(0, Math.floor(delayMs / 2));
       const nudgeTimer = setTimeout(async () => {
         this.nudgeTimers.delete(chat.id);
-        const freshWindow = await this.db.query.dailyWindows.findFirst({
-          where: eq(dailyWindows.id, window.id),
-        });
-        const freshChat = await this.db.query.chats.findFirst({
-          where: eq(chats.id, chat.id),
-        });
-        if (!freshWindow || !freshChat || freshWindow.status !== "open") return;
-        if (!freshChat.nudgeEnabled) return;
-        await sendNudge({ db: this.db, api: this.getApi(), chat: freshChat, window: freshWindow });
+        try {
+          const freshWindow = await this.db.query.dailyWindows.findFirst({
+            where: eq(dailyWindows.id, window.id),
+          });
+          const freshChat = await this.db.query.chats.findFirst({
+            where: eq(chats.id, chat.id),
+          });
+          if (!freshWindow || !freshChat || freshWindow.status !== "open") return;
+          if (!freshChat.nudgeEnabled) return;
+          await sendNudge({
+            db: this.db,
+            api: this.getApi(),
+            chat: freshChat,
+            window: freshWindow,
+          });
+        } catch (err) {
+          console.error(`Nudge failed for chat ${chat.id}:`, err);
+        }
       }, nudgeDelayMs);
 
       this.nudgeTimers.set(chat.id, nudgeTimer);
