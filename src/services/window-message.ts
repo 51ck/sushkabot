@@ -63,12 +63,22 @@ export function buildWindowMessage(params: {
   };
 }
 
+const SUMMARY_FALLBACKS = [
+  "Ещё один день позади — вы справились 💪",
+  "Вечер закрыт. Завтра продолжаем 🫡",
+  "День пройден. Красавчики на связи 💪",
+  "Окно закрыто. Отдыхайте, завтра снова 🫡",
+];
+
 export function buildSummaryMessage(params: {
   checkinDate: string;
   intro?: string | null;
 }): string {
+  if (params.intro?.trim()) return params.intro.trim();
   const dateLabel = DateTime.fromISO(params.checkinDate).setLocale("ru").toFormat("d MMMM");
-  return params.intro?.trim() || `📊 Итоги · ${dateLabel}`;
+  const dayOfYear = DateTime.fromISO(params.checkinDate).ordinal ?? 0;
+  const fallback = SUMMARY_FALLBACKS[dayOfYear % SUMMARY_FALLBACKS.length];
+  return `📊 ${dateLabel} · ${fallback}`;
 }
 
 export function formatMemberMention(username: string | null, displayName: string): string {

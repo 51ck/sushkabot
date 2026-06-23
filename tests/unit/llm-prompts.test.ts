@@ -46,7 +46,10 @@ const liveContext: WindowHighlightContext = {
       intoxStreakBefore: 0,
       soberStreakAfter: 5,
       intoxStreakAfter: 0,
+      soberMax: 10,
+      totalSoberDays: 20,
       event: "extended_sober",
+      nearMilestone: 7,
     },
   ],
 };
@@ -121,7 +124,11 @@ describe("buildSummaryUserPrompt", () => {
 describe("formatHighlightsBlock", () => {
   test("renders structured highlight lines for LLM", () => {
     const block = formatHighlightsBlock(liveContext.highlights);
-    expect(block).toMatch(/^- @alice: красавчик, трезвость 4→5, event=extended_sober$/);
+    expect(block).toContain("@alice: красавчик, трезвость 4→5");
+    expect(block).toContain("всего_трезвых=20");
+    expect(block).toContain("рекорд=10");
+    expect(block).toContain("near_milestone=7 (ещё 2)");
+    expect(block).toContain("event=extended_sober");
   });
 });
 
@@ -147,7 +154,9 @@ describe("buildStatsUserPrompt", () => {
     expectSharedSections(prompt);
     expect(prompt).toContain("## Статистика");
     expect(prompt).toContain("Участник: @alice");
-    expect(prompt).toContain("Стрик трезвости: 0 (макс 2)");
+    expect(prompt).toContain("Всего: 3 трезвых / 2 срывных дней");
+    expect(prompt).toContain("Рекорд серии трезвости: 2");
+    expect(prompt).toContain("Текущий стрик трезвости: 0");
     expect(prompt).toContain("2026-06-20: красавчик");
     expect(prompt).not.toContain('"soberCurrent"');
   });

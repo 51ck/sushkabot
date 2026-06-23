@@ -10,6 +10,7 @@ import { buildParticipantRosterStats, type ParticipantRosterEntry } from "./llm-
 import {
   type buildMemberStats,
   calculateIntoxStreak,
+  calculateMaxStreaks,
   calculateSoberStreak,
   detectTodayEvent,
   type HighlightEvent,
@@ -24,7 +25,10 @@ export interface MemberHighlight {
   intoxStreakBefore: number;
   soberStreakAfter: number;
   intoxStreakAfter: number;
+  soberMax: number;
+  totalSoberDays: number;
   event: HighlightEvent;
+  nearMilestone: number | null;
 }
 
 export interface WindowHighlightContext {
@@ -55,6 +59,17 @@ async function getMemberHistory(
   return rows
     .filter((r) => r.checkinDate <= asOfDate)
     .map((r) => ({ date: r.checkinDate, status: normalizeCheckinStatus(r.status) }));
+}
+
+const MILESTONES = [7, 30, 90];
+const NEAR_MILESTONE_THRESHOLD = 3;
+
+function findNearMilestone(soberStreak: number): number | null {
+  for (const m of MILESTONES) {
+    const remaining = m - soberStreak;
+    if (remaining > 0 && remaining <= NEAR_MILESTONE_THRESHOLD) return m;
+  }
+  return null;
 }
 
 export function highlightsHash(highlights: MemberHighlight[]): string {
@@ -97,6 +112,10 @@ export async function buildWindowHighlightContext(params: {
     const soberAfter = calculateSoberStreak(history, checkinDate);
     const intoxAfter = calculateIntoxStreak(history, checkinDate);
     const event = detectTodayEvent(status, historyBefore, checkinDate);
+    const { soberMax } = calculateMaxStreaks(history.filter((d) => d.date <= checkinDate));
+    const totalSoberDays = history.filter(
+      (d) => d.date <= checkinDate && normalizeCheckinStatus(d.status) === "sober",
+    ).length;
 
     allHighlights.push({
       mention: formatMemberMention(member.username, member.displayName),
@@ -106,7 +125,10 @@ export async function buildWindowHighlightContext(params: {
       intoxStreakBefore: intoxBefore,
       soberStreakAfter: soberAfter,
       intoxStreakAfter: intoxAfter,
+      soberMax,
+      totalSoberDays,
       event,
+      nearMilestone: findNearMilestone(soberAfter),
     });
   }
 
@@ -145,7 +167,9 @@ export function formatHighlightsBlock(highlights: MemberHighlight[]): string {
           ? `трезвость ${h.soberStreakBefore}→${h.soberStreakAfter}`
           : `трезвость ${h.soberStreakAfter}`;
       const intox = h.intoxStreakAfter > 0 ? `, срыв ${h.intoxStreakAfter}` : "";
-      return `- ${h.mention}: ${h.statusLabel}, ${streak}${intox}, event=${h.event}`;
+      const cumulative = `, всего_трезвых=${h.totalSoberDays}, рекорд=${h.soberMax}`;
+      const near = h.nearMilestone ? `, near_milestone=${h.nearMilestone} (ещё ${h.nearMilestone - h.soberStreakAfter})` : "";
+      return `- ${h.mention}: ${h.statusLabel}, ${streak}${intox}${cumulative}${near}, event=${h.event}`;
     })
     .join("\n");
 }
@@ -191,12 +215,19 @@ export function formatStatsBlock(payload: StatsPromptPayload): string {
       ? "(нет отметок за 7 дней)"
       : payload.recentDays.map((d) => `- ${d.date}: ${d.status}`).join("\n");
 
+  const nearMilestone = findNearMilestone(payload.soberCurrent);
+  const nearLine = nearMilestone
+    ? `До следующего майлстоуна (${nearMilestone}): ${nearMilestone - payload.soberCurrent} дн.`
+    : null;
+
   return [
     `Участник: ${payload.mention}`,
     `На дату: ${payload.asOfDate}`,
-    `Стрик трезвости: ${payload.soberCurrent} (макс ${payload.soberMax})`,
-    `Стрик срыва: ${payload.intoxCurrent} (макс ${payload.intoxMax})`,
     `Всего: ${payload.totalSoberDays} трезвых / ${payload.totalSlipDays} срывных дней`,
+    `Рекорд серии трезвости: ${payload.soberMax}`,
+    `Текущий стрик трезвости: ${payload.soberCurrent}`,
+    `Стрик срыва: ${payload.intoxCurrent} (макс ${payload.intoxMax})`,
+    ...(nearLine ? [nearLine] : []),
     "Последние 7 дней:",
     recent,
   ].join("\n");
