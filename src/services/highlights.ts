@@ -168,7 +168,9 @@ export function formatHighlightsBlock(highlights: MemberHighlight[]): string {
           : `трезвость ${h.soberStreakAfter}`;
       const intox = h.intoxStreakAfter > 0 ? `, срыв ${h.intoxStreakAfter}` : "";
       const cumulative = `, всего_трезвых=${h.totalSoberDays}, рекорд=${h.soberMax}`;
-      const near = h.nearMilestone ? `, near_milestone=${h.nearMilestone} (ещё ${h.nearMilestone - h.soberStreakAfter})` : "";
+      const near = h.nearMilestone
+        ? `, near_milestone=${h.nearMilestone} (ещё ${h.nearMilestone - h.soberStreakAfter})`
+        : "";
       return `- ${h.mention}: ${h.statusLabel}, ${streak}${intox}${cumulative}${near}, event=${h.event}`;
     })
     .join("\n");

@@ -25,7 +25,9 @@ export type HighlightEvent =
   | "extended_intox"
   | "milestone_7"
   | "milestone_30"
-  | "milestone_90";
+  | "milestone_90"
+  | "comeback"
+  | "fresh_start";
 
 function buildStatusMap(history: StreakDay[]): Map<string, CheckinStatus> {
   const map = new Map<string, CheckinStatus>();
@@ -202,6 +204,9 @@ export function detectTodayEvent(
       if (soberAfter === 30) return "milestone_30";
       if (soberAfter === 90) return "milestone_90";
     }
+    if (intoxBefore >= 2) return "comeback";
+    if (soberAfter === 1 && historyBefore.length === 0) return "fresh_start";
+    if (soberAfter === 1 && intoxBefore === 1) return "fresh_start";
     if (soberAfter > soberBefore) return "extended_sober";
     return "routine";
   }
