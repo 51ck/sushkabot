@@ -24,6 +24,15 @@ export function formatCloseTime(closesAt: DateTime, timezone: string): string {
   return closesAt.setZone(timezone).toFormat("HH:mm");
 }
 
+/** Strip template chrome if LLM echoed header/footer. */
+export function sanitizeWindowBody(text: string): string {
+  let body = text.trim();
+  body = body.replace(/^🌙\s*Сушка\s*·[^\n]*\n*/m, "");
+  body = body.replace(/^⏱[^\n]*ответили\s*\n*/im, "");
+  body = body.replace(/\n*Окно закрыто\.?\s*$/im, "");
+  return body.trim();
+}
+
 export function buildWindowMessage(params: {
   chat: Chat;
   checkinDate: string;
@@ -34,14 +43,13 @@ export function buildWindowMessage(params: {
   closed?: boolean;
   generatedBody?: string | null;
 }): { text: string; replyMarkup: InlineKeyboard | undefined } {
-  const { chat, checkinDate, answeredCount, joinedCount, closesAt, now, closed, generatedBody } =
-    params;
-  const dateLabel = DateTime.fromISO(checkinDate).setLocale("ru").toFormat("d MMMM");
+  const { chat, answeredCount, joinedCount, closesAt, now, closed, generatedBody } = params;
   const closeLabel = formatCloseTime(closesAt, chat.timezone);
   const countdown = formatCountdown(closesAt, now);
-  const body = generatedBody?.trim() || chat.questionText?.trim() || DEFAULT_QUESTION;
+  const rawBody = generatedBody?.trim() || chat.questionText?.trim() || DEFAULT_QUESTION;
+  const body = sanitizeWindowBody(rawBody) || DEFAULT_QUESTION;
 
-  const lines = [`🌙 Сушка · ${dateLabel}`, "", body];
+  const lines = [body];
 
   if (closed) {
     lines.push("", "Окно закрыто.");

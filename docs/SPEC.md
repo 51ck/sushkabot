@@ -20,7 +20,7 @@ Telegram group bot for **evening sobriety check-ins**:
 
 1. Daily reminder + inline buttons
 2. Answers during configurable window
-3. In-place edit with LLM copy + live highlights per answer
+3. In-place edit: LLM body regen after each answer — highlights (who pressed what) woven into invitation text
 4. Window close → **LLM-only summary** (no roster lines in message)
 
 Stateless runtime; SQLite durable state. One long-polling process + per-chat schedulers.
@@ -321,13 +321,13 @@ User prompts use sections: `## Примеры прошлых генераций`
 **Structure** (assembled in `buildWindowMessage`):
 
 ```
-🌙 Сушка · {d MMMM}          ← header (code, Russian locale)
-
-{body}                        ← LLM or fallback
+{body}                        ← LLM or fallback (no date header)
 
 ⏱ до {HH:mm} ({Nч Mм}) · {answered}/{joined} ответили   ← footer (code)
 [ inline buttons ]
 ```
+
+No `🌙 Сушка · {date}` header — date lives only in footer countdown context if needed in LLM copy.
 
 **Body priority:** `live_body` → `generated_body` → `chats.question_text` → `DEFAULT_QUESTION`.
 
@@ -338,11 +338,12 @@ User prompts use sections: `## Примеры прошлых генераций`
 - Output: 2–4 lines, Russian, no markdown; question semantically «Оступился? Пидорнулся?»
 - Cached in `daily_windows.generated_body`
 
-**Live-window LLM** (`generateLiveWindowBody`, kind `live`) — on each answer batch after `LLM_DEBOUNCE_MS` (default 6000 ms):
+**Live-window LLM** (`generateLiveWindowBody`, kind `live`) — on each answer after `LLM_DEBOUNCE_MS` (default 6000 ms):
 
 - System: `LIVE_WINDOW_SYSTEM_PROMPT` — `src/prompts/live-window.ts`
-- Input: shared context + today's highlights JSON, mode `full|highlights_only`
-- Output: body only — **no header, no footer, no markdown**
+- Input: shared context + today's highlights (who answered, status, streak deltas, events), mode `full|highlights_only`
+- Task: **rewrite the invitation** for the group — mention new check-ins (`@user` + sober/slip), keep check-in question alive
+- Output: body only — **no `🌙 Сушка` header, no footer, no markdown**
 - Cached in `daily_windows.live_body`
 - Skipped if highlight hash unchanged since last regen
 
@@ -350,7 +351,7 @@ User prompts use sections: `## Примеры прошлых генераций`
 
 ### 7.2 Closed reminder (edited in place)
 
-Same header and body as open; footer replaced:
+Same body as open; footer replaced:
 
 ```
 Окно закрыто.
