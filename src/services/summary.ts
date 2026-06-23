@@ -8,6 +8,7 @@ import { generateSummaryIntro } from "./llm.ts";
 import { buildLlmBaseContext } from "./llm-context.ts";
 import { recordLlmGeneration } from "./llm-generations.ts";
 import { countAnswered, countJoinedMembers } from "./members.ts";
+import { buildGroupMomentum, formatMomentumForLlm } from "./momentum.ts";
 import { buildSummaryMessage } from "./window-message.ts";
 
 export async function postSummary(params: {
@@ -50,6 +51,8 @@ export async function postSummary(params: {
   let intro = window.generatedSummaryIntro;
   if (!intro) {
     const llmCtx = await buildLlmBaseContext(db, chat.id, window.checkinDate);
+    const momentumEntries = await buildGroupMomentum(db, chat.id, window.checkinDate);
+    const momentum = formatMomentumForLlm(momentumEntries);
     intro = await generateSummaryIntro({
       ...llmCtx,
       date: window.checkinDate,
@@ -58,6 +61,7 @@ export async function postSummary(params: {
       soberCount,
       minorSlipCount,
       majorSlipCount,
+      momentum,
     });
     if (intro) {
       await db

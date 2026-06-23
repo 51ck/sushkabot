@@ -7,6 +7,8 @@ import { formatStatsFallback, generatePersonalStats } from "../../services/llm.t
 import { buildLlmBaseContext } from "../../services/llm-context.ts";
 import { recordLlmGeneration } from "../../services/llm-generations.ts";
 import { ensureMember, getChatByTelegramId } from "../../services/members.ts";
+import { buildGroupMomentum, formatMomentumBoard } from "../../services/momentum.ts";
+import { postPledge } from "../../services/pledge.ts";
 import { buildMemberStats } from "../../services/streak.ts";
 import { getMemberCheckinHistory } from "../../services/summary.ts";
 import { formatMemberMention } from "../../services/window-message.ts";
@@ -69,5 +71,65 @@ export function registerCommonHandlers(bot: Bot<BotContext>): void {
 
   bot.command("status", async (ctx) => {
     await ctx.reply("Используй /stats — там полная статистика.");
+  });
+
+  bot.command("pledge", async (ctx) => {
+    if (!isGroupChat(ctx) || !ctx.from || !ctx.chat) {
+      await ctx.reply(texts.notGroup);
+      return;
+    }
+
+    const chat = await getChatByTelegramId(ctx.db, String(ctx.chat.id));
+    if (!chat) {
+      await ctx.reply(texts.notConfigured);
+      return;
+    }
+
+    const today = DateTime.now().setZone(chat.timezone).toISODate() ?? "";
+    const { memberId } = await ensureMember(ctx.db, ctx.from);
+    const member = await ctx.db.query.members.findFirst({
+      where: (m, { eq }) => eq(m.id, memberId),
+    });
+    if (!member) return;
+
+    const mention = formatMemberMention(member.username, member.displayName);
+    const { alreadyPledged } = await postPledge({
+      db: ctx.db,
+      api: ctx.api,
+      chat,
+      memberId,
+      mention,
+      today,
+    });
+
+    if (alreadyPledged) {
+      await ctx.reply("Уже заявлено на сегодня 👍");
+    }
+  });
+
+  bot.command("board", async (ctx) => {
+    if (!isGroupChat(ctx) || !ctx.from || !ctx.chat) {
+      await ctx.reply(texts.notGroup);
+      return;
+    }
+
+    const chat = await getChatByTelegramId(ctx.db, String(ctx.chat.id));
+    if (!chat) {
+      await ctx.reply(texts.notConfigured);
+      return;
+    }
+
+    const today = DateTime.now().setZone(chat.timezone).toISODate() ?? "";
+    const entries = await buildGroupMomentum(ctx.db, chat.id, today);
+    const text = formatMomentumBoard(entries);
+
+    const message = await ctx.reply(text);
+    await trackBotPost({
+      db: ctx.db,
+      chatId: chat.id,
+      telegramMessageId: message.message_id,
+      kind: "command",
+      deleteAfter: DateTime.utc().plus({ minutes: env.STATS_TTL_MINUTES }),
+    });
   });
 }

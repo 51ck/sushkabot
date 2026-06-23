@@ -31,6 +31,7 @@ export interface SummaryLlmContext extends LlmBaseContext {
   soberCount: number;
   minorSlipCount: number;
   majorSlipCount: number;
+  momentum?: string;
 }
 
 function buildBaseSections(ctx: LlmBaseContext): string[] {
@@ -59,14 +60,19 @@ export function buildCheckinUserPrompt(ctx: CheckinLlmContext): string {
 }
 
 export function buildSummaryUserPrompt(ctx: SummaryLlmContext): string {
-  return [
+  const sections = [
     ...buildBaseSections(ctx),
     "",
     "## Итоги дня",
     `date: ${ctx.date}`,
     `answered: ${ctx.answeredCount}/${ctx.joinedCount}`,
     `красавчики: ${ctx.soberCount}, оступились: ${ctx.minorSlipCount}, пидорнулись: ${ctx.majorSlipCount}`,
-    "",
-    "Сгенерируй вечерний итог — только body текста.",
-  ].join("\n");
+  ];
+
+  if (ctx.momentum) {
+    sections.push("", "## Моментум группы", ctx.momentum);
+  }
+
+  sections.push("", "Сгенерируй вечерний итог — только body текста.");
+  return sections.join("\n");
 }

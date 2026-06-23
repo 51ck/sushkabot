@@ -10,6 +10,8 @@ interface BotCommandEntry {
 export async function registerBotCommands(api: Api): Promise<void> {
   const memberGroupCommands: BotCommandEntry[] = [
     { command: "stats", description: "Твоя статистика и стрики" },
+    { command: "pledge", description: "Заявить: сегодня красавчик" },
+    { command: "board", description: "Моментум группы" },
     { command: "help", description: "Список команд" },
   ];
 
