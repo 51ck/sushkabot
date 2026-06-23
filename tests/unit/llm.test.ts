@@ -3,6 +3,7 @@ import {
   buildLlmRequestPayload,
   extractCompletionText,
   normalizeApiBase,
+  sanitizeStatsBody,
 } from "../../src/services/llm.ts";
 
 describe("normalizeApiBase", () => {
@@ -33,6 +34,21 @@ describe("extractCompletionText", () => {
       ],
     });
     expect(text).toBeNull();
+  });
+});
+
+describe("sanitizeStatsBody", () => {
+  test("strips old template header and numeric lines", () => {
+    const raw = [
+      "📊 Статистика · @alice",
+      "",
+      "Трезвость: 0 (макс 2)",
+      "Срыв: 0 (макс 1)",
+      "Всего: 3 трезвых / 2 срывных дней",
+      "",
+      "LLM_BODY_KEEP",
+    ].join("\n");
+    expect(sanitizeStatsBody(raw)).toBe("LLM_BODY_KEEP");
   });
 });
 

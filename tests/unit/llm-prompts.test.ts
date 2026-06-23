@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { buildLiveWindowUserPrompt } from "../../src/prompts/live-window.ts";
+import { buildLiveWindowUserPrompt, buildStatsUserPrompt } from "../../src/prompts/live-window.ts";
 import { buildCheckinUserPrompt, buildSummaryUserPrompt } from "../../src/prompts/messages.ts";
 import type { WindowHighlightContext } from "../../src/services/highlights.ts";
-import { formatHighlightsBlock } from "../../src/services/highlights.ts";
+import { formatHighlightsBlock, formatStatsBlock } from "../../src/services/highlights.ts";
 import type { LlmBaseContext } from "../../src/services/llm-context.ts";
 
 const baseLlmContext: LlmBaseContext = {
@@ -122,5 +122,41 @@ describe("formatHighlightsBlock", () => {
   test("renders structured highlight lines for LLM", () => {
     const block = formatHighlightsBlock(liveContext.highlights);
     expect(block).toMatch(/^- @alice: красавчик, трезвость 4→5, event=extended_sober$/);
+  });
+});
+
+const statsPayload = {
+  mention: "@alice",
+  asOfDate: "2026-06-23",
+  soberCurrent: 0,
+  soberMax: 2,
+  intoxCurrent: 0,
+  intoxMax: 1,
+  totalSoberDays: 3,
+  totalSlipDays: 2,
+  recentDays: [
+    { date: "2026-06-20", status: "красавчик" },
+    { date: "2026-06-21", status: "оступился" },
+  ],
+};
+
+describe("buildStatsUserPrompt", () => {
+  test("includes readable stats block and shared context", () => {
+    const prompt = buildStatsUserPrompt({ ...baseLlmContext, statsPayload });
+
+    expectSharedSections(prompt);
+    expect(prompt).toContain("## Статистика");
+    expect(prompt).toContain("Участник: @alice");
+    expect(prompt).toContain("Стрик трезвости: 0 (макс 2)");
+    expect(prompt).toContain("2026-06-20: красавчик");
+    expect(prompt).not.toContain('"soberCurrent"');
+  });
+});
+
+describe("formatStatsBlock", () => {
+  test("placeholder when no recent check-ins", () => {
+    expect(formatStatsBlock({ ...statsPayload, recentDays: [] })).toContain(
+      "(нет отметок за 7 дней)",
+    );
   });
 });
