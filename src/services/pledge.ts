@@ -26,7 +26,7 @@ export function hasPledgedToday(chatId: number, memberId: number, date: string):
 function markPledged(chatId: number, memberId: number, date: string): void {
   const key = getPledgeKey(chatId, date);
   if (!pledgedToday.has(key)) pledgedToday.set(key, new Set());
-  pledgedToday.get(key)!.add(memberId);
+  pledgedToday.get(key)?.add(memberId);
 }
 
 export async function postPledge(params: {
@@ -46,7 +46,8 @@ export async function postPledge(params: {
   markPledged(chat.id, memberId, today);
 
   const dayOfYear = DateTime.fromISO(today).ordinal ?? 0;
-  const template = PLEDGE_MESSAGES[dayOfYear % PLEDGE_MESSAGES.length] ?? "заявляет: сегодня красавчик 💪";
+  const template =
+    PLEDGE_MESSAGES[dayOfYear % PLEDGE_MESSAGES.length] ?? "заявляет: сегодня красавчик 💪";
   const text = `${mention} ${template}`;
 
   const window = await db.query.dailyWindows.findFirst({
