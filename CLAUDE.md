@@ -1,10 +1,41 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) in this repo.
+
+## Spec First
+
+Behavior/flow/command/LLM prompt/schema/env change:
+
+1. **Update spec first** — edit [`docs/SPEC.md`](docs/SPEC.md): version note if needed, affected sections, edge cases.
+2. **Then implement** — code, migrations, tests follow spec.
+3. **Keep in sync** — drift mid-task → fix spec or code.
+
+### Skip spec update only when
+
+- Pure refactor, zero behavior change
+- Typo/formatting in non-spec files
+- User says spec later
+
+### Spec touch checklist
+
+- §3 scope (in/out of scope)
+- §4 flows if UX changes
+- §7 messages/LLM if copy or generation changes
+- §9 schema if tables/columns change
+- §11 env if new variables
+- §12 edge cases for new branches
+- Appendix A file map for new modules
+
+### Example
+
+```
+BAD:  add closeWindow delete logic → commit → maybe update SPEC
+GOOD: SPEC §4.2 + §7.5 describe delete-on-close rules → then window.ts + tests
+```
 
 ## Project
 
-Sushkabot — Telegram bot for group sobriety check-ins. Evening reminders with inline buttons, deadline windows, live LLM-regenerated progress messages, and daily summaries with dual streak tracking. Russian language UI. SQLite-backed, stateless runtime.
+Sushkabot — Telegram group sobriety check-ins. Evening reminders + inline buttons, deadline windows, live LLM progress regen, daily summaries + dual streaks. Russian UI. SQLite, stateless runtime.
 
 ## Commands
 
@@ -43,54 +74,54 @@ pnpm db:migrate             # Run migrations manually (auto-runs on bot start)
 
 ### Key layers
 
-- **`src/bot/`** — grammY bot factory, handler registration, keyboards. Context (`BotContext`) extends grammY with `db` and `scheduler` injected via middleware.
-- **`src/services/`** — business logic. Each service is a set of functions taking `db` and `api` as needed. No classes except `SchedulerService`. Key services:
+- **`src/bot/`** — grammY factory, handlers, keyboards. `BotContext` extends grammY; `db` + `scheduler` via middleware.
+- **`src/services/`** — business logic. Functions take `db`/`api`. No classes except `SchedulerService`. Key:
   - `window.ts` — `openWindow`/`closeWindow`, stale post cleanup on open
   - `scheduler.ts` — per-chat cron (open) + setTimeout (close) + minute cron (expired post cleanup)
   - `members.ts` — roster, `recordCheckin`, live LLM refresh trigger
-  - `streak.ts` — dual sober/intox streak calculation from checkin history
+  - `streak.ts` — dual sober/intox streaks from checkin history
   - `llm.ts` — OpenAI-compatible HTTP client, DeepSeek thinking disabled
-  - `llm-context.ts` — shared context builder (chat snippets + roster + style examples) for all LLM calls
-  - `message-debounce.ts` — separate debounce timers for Telegram edits (2s) and LLM regen (6s)
-- **`src/prompts/`** — LLM system/user prompts for open, live, summary, stats
-- **`src/db/`** — Drizzle schema, client factory, migration runner. Telegram IDs stored as `text`.
-- **`drizzle/`** — Sequential SQL migration files (applied automatically on start)
+  - `llm-context.ts` — shared context (chat snippets + roster + style examples) for all LLM calls
+  - `message-debounce.ts` — debounce: Telegram edits (2s), LLM regen (6s)
+- **`src/prompts/`** — LLM prompts: open, live, summary, stats
+- **`src/db/`** — Drizzle schema, client factory, migrations. Telegram IDs as `text`.
+- **`drizzle/`** — sequential SQL migrations (auto on start)
 
 ### Handler registration order matters
-In `src/bot/bot.ts`: common → chat-log → reactions → setup-wizard → settings → checkin → dev. Chat-log must register before checkin to capture reply tracking.
+`src/bot/bot.ts`: common → chat-log → reactions → setup-wizard → settings → checkin → dev. Chat-log before checkin for reply tracking.
 
 ### Callback data prefixes
-- `checkin:` — check-in button taps (`krasavchik`, `ostupilsya`, `pidornulsya`)
-- `set:` — group settings wizard callbacks
-- `set:dm:` — DM timezone picker callbacks
+- `checkin:` — button taps (`krasavchik`, `ostupilsya`, `pidornulsya`)
+- `set:` — group settings wizard
+- `set:dm:` — DM timezone picker
 
 ### Check-in status model
-Three statuses: `sober`, `minor_slip`, `major_slip`. Legacy DB values `slip`/`skipped` normalized at read time via `normalizeCheckinStatus` in `src/types.ts`. "Оступился" after yesterday's slip escalates to `major_slip`.
+Three: `sober`, `minor_slip`, `major_slip`. Legacy `slip`/`skipped` normalized at read via `normalizeCheckinStatus` in `src/types.ts`. "Оступился" after yesterday slip → `major_slip`.
 
 ### LLM is optional
-When `OPENAI_API_KEY` is unset, all LLM paths fall back to static Russian text. LLM failures keep previous body or use `DEFAULT_QUESTION`. Bot never crashes on LLM errors.
+No `OPENAI_API_KEY` → static Russian text. LLM fail → keep prior body or `DEFAULT_QUESTION`. Never crash on LLM errors.
 
 ### Window lifecycle
-`open` → answers (debounced edit + LLM regen) → `closed` (auto minor_slip for silent members) → `summarized`. One window per chat per calendar day. `checkin_date` = calendar day when window **opened** in chat timezone.
+`open` → answers (debounced edit + LLM regen) → `closed` (auto `minor_slip` for silent) → `summarized`. One window/chat/calendar day. `checkin_date` = calendar day window **opened** in chat TZ.
 
 ## Testing
 
-Tests use `bun:test`. Test setup in `tests/setup.ts` sets env defaults including `DATABASE_PATH=:memory:`. Integration tests use real in-memory SQLite. Handler tests use `bot.handleUpdate()` with API transformer mocks — no real Telegram calls.
+`bun:test`. `tests/setup.ts` sets env incl `DATABASE_PATH=:memory:`. Integration: in-memory SQLite. Handlers: `bot.handleUpdate()` + API mocks, no real Telegram.
 
-Test fixtures live in `tests/fixtures/`. Helper utilities in `tests/helpers/` (clock mocking, DB setup).
+Fixtures: `tests/fixtures/`. Helpers: `tests/helpers/` (clock mock, DB setup).
 
 ## Migrations
 
-Migrations in `drizzle/*.sql` run automatically on bot start (`runMigrations` in `src/db/migrate.ts` called from `src/index.ts`). After adding schema changes to `src/db/schema.ts`, run `pnpm db:generate` to create a new migration file.
+`drizzle/*.sql` auto on start (`runMigrations` in `src/db/migrate.ts` from `src/index.ts`). Schema change in `src/db/schema.ts` → `pnpm db:generate`.
 
 ## Development setup
 
-1. Copy `.env.development.example` to `.env.development`
-2. Set `BOT_TOKEN` (from @BotFather) and `ADMIN_USER_IDS`
+1. Copy `.env.development.example` → `.env.development`
+2. Set `BOT_TOKEN` (@BotFather) + `ADMIN_USER_IDS`
 3. `corepack enable && pnpm install && pnpm dev`
-4. Add bot to a private supergroup as admin with Privacy Mode off
-5. `/setup` in group, then `/force_open` to test without waiting for cron
+4. Add bot to private supergroup as admin, Privacy Mode off
+5. `/setup` in group, `/force_open` to test without cron
 
 ## Deploy
 
-Push to `master` triggers: lint+typecheck+test → Docker build → GHCR push → SSH deploy to VPS. Container pulls only (no build on server). Compose uses parent `.env` + `data/` volume for SQLite persistence.
+Push `master` → lint+typecheck+test → Docker build → GHCR push → SSH deploy VPS. Container pulls only. Compose: parent `.env` + `data/` volume for SQLite.
