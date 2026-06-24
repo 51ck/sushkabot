@@ -139,6 +139,61 @@ describe("detectTodayEvent", () => {
     }
     expect(detectTodayEvent("sober", history, "2026-05-07")).toBe("milestone_7");
   });
+
+  test("comeback: sober after 2+ consecutive slip days", () => {
+    const history = days([
+      ["2026-05-23", "sober"],
+      ["2026-05-24", "minor_slip"],
+      ["2026-05-25", "major_slip"],
+    ]);
+    expect(detectTodayEvent("sober", history, "2026-05-26")).toBe("comeback");
+  });
+
+  test("comeback: sober after 3 consecutive minor slips", () => {
+    const history = days([
+      ["2026-05-23", "minor_slip"],
+      ["2026-05-24", "minor_slip"],
+      ["2026-05-25", "minor_slip"],
+    ]);
+    expect(detectTodayEvent("sober", history, "2026-05-26")).toBe("comeback");
+  });
+
+  test("fresh_start: first ever check-in (no history)", () => {
+    expect(detectTodayEvent("sober", [], "2026-05-26")).toBe("fresh_start");
+  });
+
+  test("fresh_start: sober after major_slip (streak broken, single slip day)", () => {
+    const history = days([
+      ["2026-05-24", "sober"],
+      ["2026-05-25", "major_slip"],
+    ]);
+    expect(detectTodayEvent("sober", history, "2026-05-26")).toBe("fresh_start");
+  });
+
+  test("extended_sober after single grace minor (streak preserved)", () => {
+    const history = days([
+      ["2026-05-23", "sober"],
+      ["2026-05-24", "sober"],
+      ["2026-05-25", "minor_slip"],
+    ]);
+    expect(detectTodayEvent("sober", history, "2026-05-26")).toBe("extended_sober");
+  });
+
+  test("broke_sober on minor_slip that breaks streak", () => {
+    const history = days([
+      ["2026-05-23", "sober"],
+      ["2026-05-24", "minor_slip"],
+    ]);
+    expect(detectTodayEvent("minor_slip", history, "2026-05-25")).toBe("broke_sober");
+  });
+
+  test("extended_sober on regular sober day continuation", () => {
+    const history = days([
+      ["2026-05-24", "sober"],
+      ["2026-05-25", "sober"],
+    ]);
+    expect(detectTodayEvent("sober", history, "2026-05-26")).toBe("extended_sober");
+  });
 });
 
 describe("calculateStreak alias", () => {
