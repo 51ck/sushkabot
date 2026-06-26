@@ -223,7 +223,7 @@ export async function closeWindow(params: {
         answeredCount,
         joinedCount,
         closesAt,
-          closed: true,
+        closed: true,
         generatedBody: body,
       });
 
