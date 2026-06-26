@@ -130,7 +130,6 @@ async function applyWindowMessageEdit(
 
   const answeredCount = await countAnswered(db, window.id);
   const joinedCount = await countJoinedMembers(db, chat.id);
-  const now = DateTime.utc();
   const closesAt = DateTime.fromISO(window.windowClosesAt, { zone: "utc" });
   const body = window.liveBody ?? window.generatedBody;
 
@@ -140,7 +139,6 @@ async function applyWindowMessageEdit(
     answeredCount,
     joinedCount,
     closesAt,
-    now,
     closed: window.status !== "open",
     generatedBody: body,
   });
