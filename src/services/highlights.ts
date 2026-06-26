@@ -86,10 +86,20 @@ export async function buildWindowHighlightContext(params: {
   answeredCount: number;
   joinedCount: number;
   closesAt: DateTime;
+  timezone: string;
   styleExamples: Array<{ kind: string; text: string }>;
 }): Promise<WindowHighlightContext> {
-  const { db, chatId, windowId, checkinDate, answeredCount, joinedCount, closesAt, styleExamples } =
-    params;
+  const {
+    db,
+    chatId,
+    windowId,
+    checkinDate,
+    answeredCount,
+    joinedCount,
+    closesAt,
+    timezone,
+    styleExamples,
+  } = params;
 
   const windowCheckins = await db.query.checkins.findMany({
     where: eq(checkins.dailyWindowId, windowId),
@@ -147,7 +157,7 @@ export async function buildWindowHighlightContext(params: {
     checkinDate,
     answeredCount,
     joinedCount,
-    closesAt: closesAt.toISO() ?? closesAt.toUTC().toISO() ?? "",
+    closesAt: closesAt.setZone(timezone).toFormat("HH:mm"),
     mode,
     highlights,
     chatSnippets,

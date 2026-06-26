@@ -175,6 +175,7 @@ function scheduleLiveWindowRegen(api: Api, db: AppDatabase, chat: Chat, windowId
       answeredCount,
       joinedCount,
       closesAt,
+      timezone: chat.timezone,
       styleExamples,
     });
 
