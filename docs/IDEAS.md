@@ -14,4 +14,4 @@
 - **`@grammyjs/conversations`** в `dependencies`, но нигде не используется (SPEC §10.2 подтверждает). Можно удалить.
 - **Дублирование `getMemberCheckinHistory`:** Функция определена в `src/services/summary.ts` и почти идентичная в `src/services/highlights.ts` (`getMemberHistory`). Можно вынести в общий модуль.
 - **LLM-наблюдаемость:** При `LOG_LEVEL=debug` логируются полные payloads. В production нет метрик (время ответа, количество fallbacks, ошибки). Стоит добавить счётчики или structured logging.
-- **Поля-заглушки из SPEC §3.2:** `nudge_enabled` (column exists, no logic), `checkins.note` (column exists, unused), `members.timezone_override` (stored, not applied). Решить: подключать в Волне 3 или убирать из схемы.
+- **Поля-заглушки из SPEC §3.2:** `checkins.note` (column exists, unused), `members.timezone_override` (stored, not applied). Решить: подключать или убирать из схемы.

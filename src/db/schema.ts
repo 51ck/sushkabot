@@ -11,7 +11,7 @@ export const chats = sqliteTable(
     checkinHour: integer("checkin_hour").notNull().default(21),
     checkinMinute: integer("checkin_minute").notNull().default(0),
     windowDurationMinutes: integer("window_duration_minutes").notNull().default(120),
-    questionText: text("question_text").notNull().default("Оступился? Пидорнулся?"),
+    questionText: text("question_text").notNull().default("Оступился сегодня?"),
     responseMode: text("response_mode").notNull().default("sushka"),
     buttonLabels: text("button_labels"),
     nudgeEnabled: integer("nudge_enabled", { mode: "boolean" }).notNull().default(false),

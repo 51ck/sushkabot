@@ -7,7 +7,7 @@ import { type CheckinButtonKey, type CheckinStatus, resolveCheckinStatus } from 
 import { getPreviousDayStatus } from "./checkin-status.ts";
 import { buildWindowHighlightContext, highlightsHash } from "./highlights.ts";
 import { generateLiveWindowBody } from "./llm.ts";
-import { getRecentLlmGenerations, recordLlmGeneration } from "./llm-generations.ts";
+import { recordLlmGeneration } from "./llm-generations.ts";
 import { debouncedEditMessage, debouncedLlmRegen } from "./message-debounce.ts";
 import { buildWindowMessage } from "./window-message.ts";
 
@@ -165,17 +165,14 @@ function scheduleLiveWindowRegen(api: Api, db: AppDatabase, chat: Chat, windowId
     const answeredCount = await countAnswered(db, window.id);
     const joinedCount = await countJoinedMembers(db, chat.id);
     const closesAt = DateTime.fromISO(window.windowClosesAt, { zone: "utc" });
-    const styleExamples = await getRecentLlmGenerations(db, chat.id);
-
     const ctx = await buildWindowHighlightContext({
       db,
-      chatId: chat.id,
+      chat,
       windowId: window.id,
       checkinDate: window.checkinDate,
       answeredCount,
       joinedCount,
       closesAt,
-      styleExamples,
     });
 
     const hash = highlightsHash(ctx.highlights);

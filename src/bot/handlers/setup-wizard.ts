@@ -80,7 +80,7 @@ function buildMenuText(mode: "setup" | "config", draft: WizardDraft): string {
     `🌍 Часовой пояс: ${draft.timezone}`,
     `⏳ Окно ответа: ${draft.windowDurationMinutes} мин`,
     "",
-    "Вопрос и кнопки фиксированы: «Оступился? Пидорнулся?»",
+    "Вопрос и кнопки фиксированы: «Оступился сегодня?» + Красавчик / Оступился",
   ].join("\n");
 }
 

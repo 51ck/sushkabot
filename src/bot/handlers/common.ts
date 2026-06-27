@@ -10,6 +10,7 @@ import { ensureMember, getChatByTelegramId } from "../../services/members.ts";
 import { buildGroupMomentum, formatMomentumBoard } from "../../services/momentum.ts";
 import { postPledge } from "../../services/pledge.ts";
 import { buildMemberStats } from "../../services/streak.ts";
+import { computeStreakQuality } from "../../services/streak-quality.ts";
 import { getMemberCheckinHistory } from "../../services/summary.ts";
 import { formatMemberMention } from "../../services/window-message.ts";
 import { texts } from "../../texts.ts";
@@ -43,15 +44,30 @@ export function registerCommonHandlers(bot: Bot<BotContext>): void {
 
     const history = await getMemberCheckinHistory(ctx.db, chat.id, memberId, today);
     const stats = buildMemberStats(history, today);
-    const weekStart = DateTime.fromISO(today).minus({ days: 7 }).toISODate() ?? today;
+    const weekStart = DateTime.fromISO(today).minus({ days: 14 }).toISODate() ?? today;
     const recentDays = history
       .filter((d) => d.date >= weekStart)
       .sort((a, b) => a.date.localeCompare(b.date));
 
+    const quality = computeStreakQuality(history, today);
     const mention = formatMemberMention(member.username, member.displayName);
-    const payload = buildStatsPayload({ mention, checkinDate: today, stats, recentDays });
+    const payload = buildStatsPayload({
+      mention,
+      checkinDate: today,
+      stats,
+      recentDays,
+      pattern: quality.pattern,
+      quality: quality.quality,
+    });
 
-    const llmCtx = await buildLlmBaseContext(ctx.db, chat.id, today);
+    const closesAt = DateTime.now().setZone(chat.timezone).plus({ hours: 2 });
+    const llmCtx = await buildLlmBaseContext({
+      db: ctx.db,
+      chat,
+      asOfDate: today,
+      closesAt,
+      kind: "stats",
+    });
     const llmText = await generatePersonalStats({ ...llmCtx, statsPayload: payload });
     const text = llmText ?? formatStatsFallback(payload);
 

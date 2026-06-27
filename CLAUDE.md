@@ -91,7 +91,7 @@ pnpm db:migrate             # Run migrations manually (auto-runs on bot start)
 `src/bot/bot.ts`: common → chat-log → reactions → setup-wizard → settings → checkin → dev. Chat-log before checkin for reply tracking.
 
 ### Callback data prefixes
-- `checkin:` — button taps (`krasavchik`, `ostupilsya`, `pidornulsya`)
+- `checkin:` — button taps (`krasavchik`, `ostupilsya`)
 - `set:` — group settings wizard
 - `set:dm:` — DM timezone picker
 

@@ -1,5 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { Api } from "grammy";
+import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
 import { type Chat, chatMembers, checkins, dailyWindows } from "../db/schema.ts";
 import { type CheckinStatus, normalizeCheckinStatus } from "../types.ts";
@@ -47,10 +48,17 @@ export async function postSummary(params: {
 
   const joinedCount = await countJoinedMembers(db, chat.id);
   const answeredCount = await countAnswered(db, window.id);
+  const closesAt = DateTime.fromISO(window.windowClosesAt, { zone: "utc" });
 
   let intro = window.generatedSummaryIntro;
   if (!intro) {
-    const llmCtx = await buildLlmBaseContext(db, chat.id, window.checkinDate);
+    const llmCtx = await buildLlmBaseContext({
+      db,
+      chat,
+      asOfDate: window.checkinDate,
+      closesAt,
+      kind: "summary",
+    });
     const momentumEntries = await buildGroupMomentum(db, chat.id, window.checkinDate);
     const momentum = formatMomentumForLlm(momentumEntries);
     intro = await generateSummaryIntro({
@@ -77,7 +85,12 @@ export async function postSummary(params: {
     intro,
   });
 
-  const message = await api.sendMessage(Number(chat.telegramChatId), text);
+  const sendParams: Parameters<Api["sendMessage"]>[2] = {};
+  if (window.messageId) {
+    sendParams.reply_parameters = { message_id: window.messageId };
+  }
+
+  const message = await api.sendMessage(Number(chat.telegramChatId), text, sendParams);
   await trackBotPost({
     db,
     chatId: chat.id,
