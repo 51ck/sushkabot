@@ -116,7 +116,7 @@ When `answeredCount > HIGHLIGHT_FULL_LIST_MAX`, live mode = `highlights_only` (n
 |---------------------|------------------|
 | Callbacks, status resolution, streak math | Window open body |
 | Cron open/close, auto `minor_slip` | Live regen after answers |
-| Footer countdown, button labels | Evening summary |
+| Footer close time, button labels | Evening summary |
 | Milestone detection | Personal `/stats` |
 | Schedule, timezone in context | Tone, @mentions, chat weave |
 
@@ -161,7 +161,7 @@ LLM failure → keep prior body or static fallback; never crash.
 | `checkins.note` | Column unused |
 | Personal TZ in scheduling | `timezone_override` stored, not applied to cron |
 | Group weekly rollups | Phase 3 |
-| Periodic countdown refresh | Footer updates on answer debounce only |
+| Live countdown in footer | Stale after debounced edit; footer shows local close time only |
 | Per-person window times | v2 |
 | Contextual LLM replies to chat | Future |
 | Webhook mode | Long polling only |
@@ -188,7 +188,7 @@ Admin `/setup` or `/config` → inline wizard (one message, in-place edits). Def
 ```
 {LLM body}
 
-⏱ до {HH:mm} ({countdown}) · {answered}/{joined} ответили
+⏱ до {HH:mm} · {answered}/{joined} ответили
 [ inline buttons ]
 ```
 
