@@ -39,13 +39,11 @@ export function buildWindowMessage(params: {
   answeredCount: number;
   joinedCount: number;
   closesAt: DateTime;
-  now: DateTime;
   closed?: boolean;
   generatedBody?: string | null;
 }): { text: string; replyMarkup: InlineKeyboard | undefined } {
-  const { chat, answeredCount, joinedCount, closesAt, now, closed, generatedBody } = params;
+  const { chat, answeredCount, joinedCount, closesAt, closed, generatedBody } = params;
   const closeLabel = formatCloseTime(closesAt, chat.timezone);
-  const countdown = formatCountdown(closesAt, now);
   const rawBody = generatedBody?.trim() || chat.questionText?.trim() || DEFAULT_QUESTION;
   const body = sanitizeWindowBody(rawBody) || DEFAULT_QUESTION;
 
@@ -54,7 +52,7 @@ export function buildWindowMessage(params: {
   if (closed) {
     lines.push("", "Окно закрыто.");
   } else {
-    lines.push("", `⏱ до ${closeLabel} (${countdown}) · ${answeredCount}/${joinedCount} ответили`);
+    lines.push("", `⏱ до ${closeLabel} · ${answeredCount}/${joinedCount} ответили`);
   }
 
   return {

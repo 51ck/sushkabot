@@ -139,7 +139,6 @@ export async function openWindow(params: {
       answeredCount,
       joinedCount,
       closesAt,
-      now: DateTime.utc(),
       generatedBody,
     });
 
@@ -206,7 +205,6 @@ export async function closeWindow(params: {
       answeredCount,
       joinedCount,
       closesAt,
-      now: DateTime.utc(),
       closed: true,
       generatedBody: body,
     });

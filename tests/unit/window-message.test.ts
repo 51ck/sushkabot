@@ -31,7 +31,6 @@ const openParams = {
   answeredCount: 3,
   joinedCount: 7,
   closesAt: DateTime.fromISO("2026-05-27T01:00:00", { zone: "Europe/Moscow" }),
-  now: DateTime.fromISO("2026-05-26T23:00:00", { zone: "Europe/Moscow" }),
 };
 
 describe("window math", () => {
@@ -73,7 +72,6 @@ describe("buildWindowMessage structure", () => {
   test("closed message has no keyboard and replaces footer", () => {
     const { text, replyMarkup } = buildWindowMessage({
       ...openParams,
-      now: DateTime.fromISO("2026-05-27T02:00:00Z"),
       closed: true,
       generatedBody: "LLM_BODY_MARKER",
     });
