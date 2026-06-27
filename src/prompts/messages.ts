@@ -1,22 +1,10 @@
 import type { LlmBaseContext } from "../services/llm-context.ts";
-import { formatChatBlock, formatRosterBlock, formatStyleBlock } from "../services/llm-context.ts";
-import { TONE } from "./tone.ts";
-
-export const CHECKIN_SYSTEM_PROMPT = `Ты — голос группового бота сушки (отказ от алкоголя и веществ).
-Пиши коротко, по-русски, без markdown. 2–4 строки максимум.
-${TONE}
-Вопрос должен по смыслу совпадать с «Оступился? Пидорнулся?», но каждый раз формулировка другая.
-Учитывай недавний чат и статистику участников — вплетай в текст, если уместно.
-Фокус на идентичность: «вы ж красавчики», «ваша сушка» — человек держится за поведение, которое ощущает как свой выбор.
-Не объясняй правила кнопок. Без шапки «🌙 Сушка · дата» и без footer со счётчиком.`;
-
-export const SUMMARY_SYSTEM_PROMPT = `Ты — голос группового бота сушки.
-Напиши вечерний итог группы (2–5 строк). Это весь текст сообщения — без шапки и без списков.
-По-русски, без markdown. Упоминай @username где уместно.
-${TONE}
-Вплети кто как ответил, стрики, контекст чата. Не пиши «Ответили: N/M» и не делай bullet-список.
-Итог — это конец дня. Заканчивай на подъёме, даже если день был тяжёлый.
-При срывах подсвечивай накопительный прогресс (всего трезвых дней, рекорд) — срыв не стирает путь.`;
+import {
+  applyContextBudget,
+  buildBasePromptSections,
+  formatScheduleBlock,
+} from "../services/llm-context.ts";
+import { formatQualityOneLiner } from "../services/streak-quality.ts";
 
 export interface CheckinLlmContext extends LlmBaseContext {
   date: string;
@@ -34,45 +22,60 @@ export interface SummaryLlmContext extends LlmBaseContext {
   momentum?: string;
 }
 
-function buildBaseSections(ctx: LlmBaseContext): string[] {
-  return [
-    "## Примеры прошлых генераций",
-    formatStyleBlock(ctx.styleExamples),
-    "",
-    "## Недавний чат",
-    formatChatBlock(ctx.chatSnippets),
-    "",
-    "## Участники",
-    formatRosterBlock(ctx.participants),
-  ];
+function trimContext<T extends LlmBaseContext>(ctx: T, fixedTail: string): T {
+  const fixed = [formatScheduleBlock(ctx.schedule), "", fixedTail].join("\n");
+  const trimmed = applyContextBudget({
+    fixed,
+    chatSnippets: ctx.chatSnippets,
+    participants: ctx.participants,
+    styleExamples: ctx.styleExamples,
+    formatSnippet: (s) => `${s.authorName}: ${s.text}`,
+    formatRoster: (p) =>
+      formatQualityOneLiner({
+        mention: p.mention,
+        soberCurrent: p.soberCurrent,
+        soberMax: p.soberMax,
+        totalSoberDays: p.totalSoberDays,
+        quality: p.quality,
+      }),
+    formatStyle: (e) => `- [${e.kind}] ${e.text}`,
+  });
+  return {
+    ...ctx,
+    chatSnippets: trimmed.chatSnippets,
+    participants: trimmed.participants,
+    styleExamples: trimmed.styleExamples,
+  };
 }
 
 export function buildCheckinUserPrompt(ctx: CheckinLlmContext): string {
-  return [
-    ...buildBaseSections(ctx),
-    "",
+  const tail = [
     "## Сегодня",
     `date: ${ctx.date}`,
     `answered: ${ctx.answeredCount}/${ctx.joinedCount}`,
     "",
     "Сгенерируй текст напоминания с вопросом для чек-ина.",
   ].join("\n");
+
+  const trimmed = trimContext(ctx, tail);
+  return [...buildBasePromptSections(trimmed), "", tail].join("\n");
 }
 
 export function buildSummaryUserPrompt(ctx: SummaryLlmContext): string {
-  const sections = [
-    ...buildBaseSections(ctx),
-    "",
+  const tailParts = [
     "## Итоги дня",
     `date: ${ctx.date}`,
     `answered: ${ctx.answeredCount}/${ctx.joinedCount}`,
-    `красавчики: ${ctx.soberCount}, оступились: ${ctx.minorSlipCount}, пидорнулись: ${ctx.majorSlipCount}`,
+    `красавчики: ${ctx.soberCount}, оступились: ${ctx.minorSlipCount}, major: ${ctx.majorSlipCount}`,
   ];
 
   if (ctx.momentum) {
-    sections.push("", "## Моментум группы", ctx.momentum);
+    tailParts.push("", "## Моментум группы", ctx.momentum);
   }
 
-  sections.push("", "Сгенерируй вечерний итог — только body текста.");
-  return sections.join("\n");
+  tailParts.push("", "Сгенерируй вечерний итог — только body текста.");
+  const tail = tailParts.join("\n");
+
+  const trimmed = trimContext(ctx, tail);
+  return [...buildBasePromptSections(trimmed), "", tail].join("\n");
 }

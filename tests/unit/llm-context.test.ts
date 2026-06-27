@@ -2,9 +2,18 @@ import { describe, expect, test } from "bun:test";
 import {
   formatChatBlock,
   formatRosterBlock,
+  formatScheduleBlock,
   formatStyleBlock,
-  shouldDeleteWindowInvitation,
 } from "../../src/services/llm-context.ts";
+
+const sampleQuality = {
+  soberCurrent: 3,
+  graceDaysInWindow: 0,
+  calendarSpan: 3,
+  soberRatio14: 1,
+  quality: "solid" as const,
+  pattern: "-----KKK",
+};
 
 describe("llm-context formatters", () => {
   test("formatChatBlock returns placeholder when empty", () => {
@@ -20,7 +29,7 @@ describe("llm-context formatters", () => {
     expect(formatStyleBlock([])).toBe("(нет примеров)");
   });
 
-  test("formatRosterBlock serializes participants", () => {
+  test("formatRosterBlock renders compact quality lines", () => {
     const block = formatRosterBlock([
       {
         mention: "@bob",
@@ -30,27 +39,23 @@ describe("llm-context formatters", () => {
         intoxMax: 2,
         totalSoberDays: 5,
         totalSlipDays: 1,
+        quality: sampleQuality,
       },
     ]);
     expect(block).toContain("@bob");
-    expect(block).toContain('"sober": 3');
-  });
-});
-
-describe("shouldDeleteWindowInvitation", () => {
-  test("deletes when no reply and no reaction", () => {
-    expect(shouldDeleteWindowInvitation(false, false)).toBe(true);
+    expect(block).toContain("quality=solid");
+    expect(block).toContain("pattern=");
   });
 
-  test("keeps when reply exists", () => {
-    expect(shouldDeleteWindowInvitation(true, false)).toBe(false);
-  });
-
-  test("keeps when reaction exists", () => {
-    expect(shouldDeleteWindowInvitation(false, true)).toBe(false);
-  });
-
-  test("keeps when both exist", () => {
-    expect(shouldDeleteWindowInvitation(true, true)).toBe(false);
+  test("formatScheduleBlock includes local times", () => {
+    const block = formatScheduleBlock({
+      timezone: "Europe/Moscow",
+      checkinOpens: "21:00",
+      windowCloses: "23:00",
+      windowDurationMinutes: 120,
+      nowLocal: "21:30",
+    });
+    expect(block).toContain("timezone: Europe/Moscow");
+    expect(block).toContain("window_closes: 23:00");
   });
 });

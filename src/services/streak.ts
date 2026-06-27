@@ -1,6 +1,7 @@
 import { DateTime } from "luxon";
 import type { CheckinStatus } from "../types.ts";
 import { normalizeCheckinStatus } from "../types.ts";
+import { computeStreakQuality, isSolidMilestone } from "./streak-quality.ts";
 
 export interface StreakDay {
   date: string;
@@ -26,6 +27,7 @@ export type HighlightEvent =
   | "milestone_7"
   | "milestone_30"
   | "milestone_90"
+  | "hollow_milestone"
   | "comeback"
   | "fresh_start";
 
@@ -199,10 +201,15 @@ export function detectTodayEvent(
   );
 
   if (todayStatus === "sober") {
+    const historyWithToday = [...historyBefore, { date: asOfDate, status: todayStatus }];
+    const quality = computeStreakQuality(historyWithToday, asOfDate);
     if ([7, 30, 90].includes(soberAfter)) {
-      if (soberAfter === 7) return "milestone_7";
-      if (soberAfter === 30) return "milestone_30";
-      if (soberAfter === 90) return "milestone_90";
+      if (isSolidMilestone(soberAfter, quality.quality)) {
+        if (soberAfter === 7) return "milestone_7";
+        if (soberAfter === 30) return "milestone_30";
+        if (soberAfter === 90) return "milestone_90";
+      }
+      return "hollow_milestone";
     }
     if (intoxBefore >= 2) return "comeback";
     if (soberAfter === 1 && historyBefore.length === 0) return "fresh_start";

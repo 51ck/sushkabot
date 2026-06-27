@@ -5,7 +5,23 @@ import type { WindowHighlightContext } from "../../src/services/highlights.ts";
 import { formatHighlightsBlock, formatStatsBlock } from "../../src/services/highlights.ts";
 import type { LlmBaseContext } from "../../src/services/llm-context.ts";
 
+const sampleQuality = {
+  soberCurrent: 5,
+  graceDaysInWindow: 0,
+  calendarSpan: 5,
+  soberRatio14: 1,
+  quality: "solid" as const,
+  pattern: "-----KKKKK",
+};
+
 const baseLlmContext: LlmBaseContext = {
+  schedule: {
+    timezone: "Europe/Moscow",
+    checkinOpens: "21:00",
+    windowCloses: "23:00",
+    windowDurationMinutes: 120,
+    nowLocal: "21:15",
+  },
   styleExamples: [{ kind: "live", text: "prior generation sample" }],
   chatSnippets: [{ authorName: "@alice", text: "chat line one" }],
   participants: [
@@ -17,6 +33,7 @@ const baseLlmContext: LlmBaseContext = {
       intoxMax: 2,
       totalSoberDays: 20,
       totalSlipDays: 3,
+      quality: sampleQuality,
     },
     {
       mention: "@bob",
@@ -26,6 +43,7 @@ const baseLlmContext: LlmBaseContext = {
       intoxMax: 4,
       totalSoberDays: 15,
       totalSlipDays: 8,
+      quality: { ...sampleQuality, soberCurrent: 0, quality: "mixed" },
     },
   ],
 };
@@ -35,7 +53,6 @@ const liveContext: WindowHighlightContext = {
   checkinDate: "2026-06-23",
   answeredCount: 1,
   joinedCount: 2,
-  closesAt: "2026-06-23T21:00:00.000Z",
   mode: "full",
   highlights: [
     {
@@ -55,13 +72,15 @@ const liveContext: WindowHighlightContext = {
 };
 
 function expectSharedSections(prompt: string): void {
+  expect(prompt).toContain("## Расписание");
+  expect(prompt).toContain("window_closes: 23:00");
   expect(prompt).toContain("## Примеры прошлых генераций");
   expect(prompt).toContain("prior generation sample");
   expect(prompt).toContain("## Недавний чат");
   expect(prompt).toContain("@alice: chat line one");
   expect(prompt).toContain("## Участники");
   expect(prompt).toContain("@bob");
-  expect(prompt).toContain('"sober": 5');
+  expect(prompt).toContain("quality=");
 }
 
 describe("buildCheckinUserPrompt", () => {
@@ -117,7 +136,7 @@ describe("buildSummaryUserPrompt", () => {
     expect(prompt).toContain("## Итоги дня");
     expect(prompt).toContain("красавчики: 1");
     expect(prompt).toContain("оступились: 1");
-    expect(prompt).toContain("пидорнулись: 0");
+    expect(prompt).toContain("major: 0");
   });
 });
 
@@ -141,6 +160,8 @@ const statsPayload = {
   intoxMax: 1,
   totalSoberDays: 3,
   totalSlipDays: 2,
+  pattern: "KmKm",
+  quality: "grace-heavy",
   recentDays: [
     { date: "2026-06-20", status: "красавчик" },
     { date: "2026-06-21", status: "оступился" },
@@ -155,8 +176,8 @@ describe("buildStatsUserPrompt", () => {
     expect(prompt).toContain("## Статистика");
     expect(prompt).toContain("Участник: @alice");
     expect(prompt).toContain("Всего: 3 трезвых / 2 срывных дней");
-    expect(prompt).toContain("Рекорд серии трезвости: 2");
-    expect(prompt).toContain("Текущий стрик трезвости: 0");
+    expect(prompt).toContain("pattern: KmKm");
+    expect(prompt).toContain("quality: grace-heavy");
     expect(prompt).toContain("2026-06-20: красавчик");
     expect(prompt).not.toContain('"soberCurrent"');
   });
@@ -165,7 +186,7 @@ describe("buildStatsUserPrompt", () => {
 describe("formatStatsBlock", () => {
   test("placeholder when no recent check-ins", () => {
     expect(formatStatsBlock({ ...statsPayload, recentDays: [] })).toContain(
-      "(нет отметок за 7 дней)",
+      "(нет отметок за 14 дней)",
     );
   });
 });

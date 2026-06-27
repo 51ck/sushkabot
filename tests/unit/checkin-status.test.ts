@@ -16,9 +16,4 @@ describe("resolveCheckinStatus", () => {
     expect(resolveCheckinStatus("ostupilsya", "minor_slip")).toBe("major_slip");
     expect(resolveCheckinStatus("ostupilsya", "major_slip")).toBe("major_slip");
   });
-
-  test("pidornulsya is always major", () => {
-    expect(resolveCheckinStatus("pidornulsya", null)).toBe("major_slip");
-    expect(resolveCheckinStatus("pidornulsya", "sober")).toBe("major_slip");
-  });
 });

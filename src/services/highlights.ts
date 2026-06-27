@@ -1,12 +1,12 @@
 import { and, desc, eq } from "drizzle-orm";
 import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
+import type { Chat } from "../db/schema.ts";
 import { checkins } from "../db/schema.ts";
 import { env } from "../env.ts";
 import type { CheckinStatus } from "../types.ts";
 import { normalizeCheckinStatus, statusToLabel } from "../types.ts";
-import { getRecentChatSnippets } from "./chat-snippets.ts";
-import { buildParticipantRosterStats, type ParticipantRosterEntry } from "./llm-context.ts";
+import { buildLlmBaseContext, filterRosterForLive, type LlmBaseContext } from "./llm-context.ts";
 import {
   type buildMemberStats,
   calculateIntoxStreak,
@@ -31,16 +31,12 @@ export interface MemberHighlight {
   nearMilestone: number | null;
 }
 
-export interface WindowHighlightContext {
+export interface WindowHighlightContext extends LlmBaseContext {
   checkinDate: string;
   answeredCount: number;
   joinedCount: number;
-  closesAt: string;
   mode: "full" | "highlights_only";
   highlights: MemberHighlight[];
-  chatSnippets: Array<{ authorName: string; text: string }>;
-  styleExamples: Array<{ kind: string; text: string }>;
-  participants: ParticipantRosterEntry[];
 }
 
 async function getMemberHistory(
@@ -80,16 +76,22 @@ export function highlightsHash(highlights: MemberHighlight[]): string {
 
 export async function buildWindowHighlightContext(params: {
   db: AppDatabase;
-  chatId: number;
+  chat: Chat;
   windowId: number;
   checkinDate: string;
   answeredCount: number;
   joinedCount: number;
   closesAt: DateTime;
-  styleExamples: Array<{ kind: string; text: string }>;
 }): Promise<WindowHighlightContext> {
-  const { db, chatId, windowId, checkinDate, answeredCount, joinedCount, closesAt, styleExamples } =
-    params;
+  const { db, chat, windowId, checkinDate, answeredCount, joinedCount, closesAt } = params;
+
+  const baseCtx = await buildLlmBaseContext({
+    db,
+    chat,
+    asOfDate: checkinDate,
+    closesAt,
+    kind: "live",
+  });
 
   const windowCheckins = await db.query.checkins.findMany({
     where: eq(checkins.dailyWindowId, windowId),
@@ -103,7 +105,7 @@ export async function buildWindowHighlightContext(params: {
     if (!member) continue;
 
     const status = normalizeCheckinStatus(checkin.status);
-    const history = await getMemberHistory(db, chatId, checkin.memberId, checkinDate);
+    const history = await getMemberHistory(db, chat.id, checkin.memberId, checkinDate);
     const historyBefore = history.filter((d) => d.date < checkinDate);
     const prevDate = DateTime.fromISO(checkinDate).minus({ days: 1 }).toISODate() ?? checkinDate;
 
@@ -140,19 +142,17 @@ export async function buildWindowHighlightContext(params: {
       ? allHighlights
       : allHighlights.filter((h) => h.event !== "routine" && h.event !== "extended_sober");
 
-  const chatSnippets = await getRecentChatSnippets(db, chatId, env.LLM_CHAT_CONTEXT_COUNT);
-  const participants = await buildParticipantRosterStats(db, chatId, checkinDate);
+  const answeredMentions = new Set(allHighlights.map((h) => h.mention));
+  const participants = filterRosterForLive(baseCtx.participants, answeredMentions);
 
   return {
+    ...baseCtx,
+    participants,
     checkinDate,
     answeredCount,
     joinedCount,
-    closesAt: closesAt.toISO() ?? closesAt.toUTC().toISO() ?? "",
     mode,
     highlights,
-    chatSnippets,
-    styleExamples,
-    participants,
   };
 }
 
@@ -185,6 +185,8 @@ export interface StatsPromptPayload {
   intoxMax: number;
   totalSoberDays: number;
   totalSlipDays: number;
+  pattern: string;
+  quality: string;
   recentDays: Array<{ date: string; status: string }>;
 }
 
@@ -193,6 +195,8 @@ export function buildStatsPayload(params: {
   checkinDate: string;
   stats: ReturnType<typeof buildMemberStats>;
   recentDays: Array<{ date: string; status: CheckinStatus }>;
+  pattern: string;
+  quality: string;
 }): StatsPromptPayload {
   return {
     mention: params.mention,
@@ -203,6 +207,8 @@ export function buildStatsPayload(params: {
     intoxMax: params.stats.intoxMax,
     totalSoberDays: params.stats.totalSoberDays,
     totalSlipDays: params.stats.totalSlipDays,
+    pattern: params.pattern,
+    quality: params.quality,
     recentDays: params.recentDays.map((d) => ({
       date: d.date,
       status: statusToLabel(d.status),
@@ -214,7 +220,7 @@ export function buildStatsPayload(params: {
 export function formatStatsBlock(payload: StatsPromptPayload): string {
   const recent =
     payload.recentDays.length === 0
-      ? "(нет отметок за 7 дней)"
+      ? "(нет отметок за 14 дней)"
       : payload.recentDays.map((d) => `- ${d.date}: ${d.status}`).join("\n");
 
   const nearMilestone = findNearMilestone(payload.soberCurrent);
@@ -229,8 +235,10 @@ export function formatStatsBlock(payload: StatsPromptPayload): string {
     `Рекорд серии трезвости: ${payload.soberMax}`,
     `Текущий стрик трезвости: ${payload.soberCurrent}`,
     `Стрик срыва: ${payload.intoxCurrent} (макс ${payload.intoxMax})`,
+    `pattern: ${payload.pattern}`,
+    `quality: ${payload.quality}`,
     ...(nearLine ? [nearLine] : []),
-    "Последние 7 дней:",
+    "Последние 14 дней:",
     recent,
   ].join("\n");
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** Fixed check-in button set for all chats. */
-export const CHECKIN_BUTTON_KEYS = ["krasavchik", "ostupilsya", "pidornulsya"] as const;
+export const CHECKIN_BUTTON_KEYS = ["krasavchik", "ostupilsya"] as const;
 export type CheckinButtonKey = (typeof CHECKIN_BUTTON_KEYS)[number];
 
 export const checkinStatusSchema = z.enum(["sober", "minor_slip", "major_slip"]);
@@ -13,12 +13,11 @@ export type LegacyCheckinStatus = CheckinStatus | "slip" | "skipped";
 export const windowStatusSchema = z.enum(["open", "closed", "summarized"]);
 export type WindowStatus = z.infer<typeof windowStatusSchema>;
 
-export const DEFAULT_QUESTION = "Оступился? Пидорнулся?";
+export const DEFAULT_QUESTION = "Оступился сегодня?";
 
 export const DEFAULT_BUTTON_LABELS: Record<CheckinButtonKey, string> = {
   krasavchik: "💪 Красавчик",
   ostupilsya: "🍺 Оступился",
-  pidornulsya: "💥 Пидорнулся",
 };
 
 export function isCheckinButtonKey(key: string): key is CheckinButtonKey {
@@ -31,8 +30,6 @@ export function buttonKeyToBaseStatus(key: CheckinButtonKey): CheckinStatus {
       return "sober";
     case "ostupilsya":
       return "minor_slip";
-    case "pidornulsya":
-      return "major_slip";
   }
 }
 
@@ -53,7 +50,7 @@ export function normalizeCheckinStatus(status: string): CheckinStatus {
   }
 }
 
-/** Previous-day slip statuses escalate a new «Оступился» tap to «Пидорнулся». */
+/** Previous-day slip statuses escalate a new «Оступился» tap to major_slip. */
 export function isEscalatingPriorStatus(status: CheckinStatus | null): boolean {
   if (!status) return false;
   return status === "minor_slip" || status === "major_slip";

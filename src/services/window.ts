@@ -2,10 +2,10 @@ import { and, eq } from "drizzle-orm";
 import type { Api } from "grammy";
 import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
-import { botPosts, type Chat, chats, dailyWindows } from "../db/schema.ts";
-import { cleanupStaleBotPosts, findBotPost, trackBotPost } from "./bot-posts.ts";
+import { type Chat, chats, dailyWindows } from "../db/schema.ts";
+import { trackBotPost } from "./bot-posts.ts";
 import { generateCheckinBody, isLlmFallbackText } from "./llm.ts";
-import { buildLlmBaseContext, shouldDeleteWindowInvitation } from "./llm-context.ts";
+import { buildLlmBaseContext } from "./llm-context.ts";
 import { recordLlmGeneration } from "./llm-generations.ts";
 import { countAnswered, countJoinedMembers, recordAbsentAsMinorSlip } from "./members.ts";
 import { postMilestoneCelebrations } from "./milestone.ts";
@@ -41,14 +41,6 @@ export async function openWindow(params: {
       return null;
     }
   }
-
-  await cleanupStaleBotPosts({
-    db,
-    api,
-    chatId: chat.id,
-    telegramChatId: chat.telegramChatId,
-    keepMessageId: existing?.messageId ?? null,
-  });
 
   const opensAt = now.toUTC();
   const closesAt = computeWindowClose(opensAt, chat.windowDurationMinutes);
@@ -120,7 +112,14 @@ export async function openWindow(params: {
 
     let generatedBody = windowRow.generatedBody;
     if (!generatedBody) {
-      const llmCtx = await buildLlmBaseContext(db, chat.id, windowRow.checkinDate);
+      const llmCtx = await buildLlmBaseContext({
+        db,
+        chat,
+        asOfDate: windowRow.checkinDate,
+        closesAt,
+        now,
+        kind: "open",
+      });
       generatedBody = await generateCheckinBody({
         ...llmCtx,
         date: windowRow.checkinDate,
@@ -201,39 +200,21 @@ export async function closeWindow(params: {
   const body = window.liveBody ?? window.generatedBody;
 
   if (window.messageId) {
-    const post = await findBotPost(db, chat.id, window.messageId);
-    const deleteInvitation = shouldDeleteWindowInvitation(
-      post?.hasReply ?? false,
-      post?.hasReaction ?? false,
-    );
+    const { text } = buildWindowMessage({
+      chat,
+      checkinDate: window.checkinDate,
+      answeredCount,
+      joinedCount,
+      closesAt,
+      now: DateTime.utc(),
+      closed: true,
+      generatedBody: body,
+    });
 
-    if (deleteInvitation) {
-      try {
-        await api.deleteMessage(Number(chat.telegramChatId), window.messageId);
-      } catch {
-        // ignore
-      }
-      await db
-        .update(botPosts)
-        .set({ deletedAt: DateTime.utc().toISO() })
-        .where(and(eq(botPosts.chatId, chat.id), eq(botPosts.telegramMessageId, window.messageId)));
-    } else {
-      const { text } = buildWindowMessage({
-        chat,
-        checkinDate: window.checkinDate,
-        answeredCount,
-        joinedCount,
-        closesAt,
-        now: DateTime.utc(),
-        closed: true,
-        generatedBody: body,
-      });
-
-      try {
-        await api.editMessageText(Number(chat.telegramChatId), window.messageId, text);
-      } catch {
-        // ignore
-      }
+    try {
+      await api.editMessageText(Number(chat.telegramChatId), window.messageId, text);
+    } catch {
+      // ignore
     }
   }
 
@@ -292,7 +273,7 @@ export async function upsertChat(
 ): Promise<Chat> {
   const payload = {
     ...data,
-    questionText: data.questionText ?? "Оступился? Пидорнулся?",
+    questionText: data.questionText ?? "Оступился сегодня?",
     responseMode: data.responseMode ?? "sushka",
     buttonLabels: data.buttonLabels ?? null,
     enabled: true as const,

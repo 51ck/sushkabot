@@ -2,16 +2,13 @@ import { env, isDevEnv } from "../env.ts";
 import {
   buildLiveWindowUserPrompt,
   buildStatsUserPrompt,
-  LIVE_WINDOW_SYSTEM_PROMPT,
-  STATS_SYSTEM_PROMPT,
   type StatsLlmContext,
 } from "../prompts/live-window.ts";
+import { loadSystemPrompt } from "../prompts/load-system.ts";
 import {
   buildCheckinUserPrompt,
   buildSummaryUserPrompt,
-  CHECKIN_SYSTEM_PROMPT,
   type CheckinLlmContext,
-  SUMMARY_SYSTEM_PROMPT,
   type SummaryLlmContext,
 } from "../prompts/messages.ts";
 import { DEFAULT_QUESTION } from "../types.ts";
@@ -47,7 +44,6 @@ export function normalizeApiBase(base: string): string {
   return `${trimmed}/v1`;
 }
 
-/** Prefer final answer; ignore reasoning trace (not user-facing copy). */
 export function extractCompletionText(data: ChatCompletionResponse): string | null {
   const choice = data.choices?.[0];
   const text = choice?.message?.content?.trim();
@@ -78,14 +74,14 @@ export function buildLlmRequestPayload(
   messages: ChatMessage[],
   apiBase = env.OPENAI_API_BASE,
 ): Record<string, unknown> {
+  const tokenKey = shouldDisableDeepSeekThinking(apiBase) ? "max_tokens" : "max_completion_tokens";
   const payload: Record<string, unknown> = {
     model: env.OPENAI_MODEL,
     temperature: 0.9,
-    max_tokens: MAX_COMPLETION_TOKENS,
+    [tokenKey]: MAX_COMPLETION_TOKENS,
     messages,
   };
 
-  // DeepSeek V4: top-level field (not extra_body — that's OpenAI SDK only).
   if (shouldDisableDeepSeekThinking(apiBase)) {
     payload.thinking = { type: "disabled" };
   }
@@ -147,9 +143,10 @@ async function chatComplete(messages: ChatMessage[], label: string): Promise<str
 }
 
 export async function generateCheckinBody(ctx: CheckinLlmContext): Promise<string> {
+  const system = await loadSystemPrompt("open");
   const generated = await chatComplete(
     [
-      { role: "system", content: CHECKIN_SYSTEM_PROMPT },
+      { role: "system", content: system },
       { role: "user", content: buildCheckinUserPrompt(ctx) },
     ],
     "open",
@@ -162,9 +159,10 @@ export function isLlmFallbackText(text: string): boolean {
 }
 
 export async function generateSummaryIntro(ctx: SummaryLlmContext): Promise<string | null> {
+  const system = await loadSystemPrompt("summary");
   return chatComplete(
     [
-      { role: "system", content: SUMMARY_SYSTEM_PROMPT },
+      { role: "system", content: system },
       { role: "user", content: buildSummaryUserPrompt(ctx) },
     ],
     "summary",
@@ -172,9 +170,10 @@ export async function generateSummaryIntro(ctx: SummaryLlmContext): Promise<stri
 }
 
 export async function generateLiveWindowBody(ctx: WindowHighlightContext): Promise<string | null> {
+  const system = await loadSystemPrompt("live");
   return chatComplete(
     [
-      { role: "system", content: LIVE_WINDOW_SYSTEM_PROMPT },
+      { role: "system", content: system },
       { role: "user", content: buildLiveWindowUserPrompt(ctx) },
     ],
     "live",
@@ -182,9 +181,10 @@ export async function generateLiveWindowBody(ctx: WindowHighlightContext): Promi
 }
 
 export async function generatePersonalStats(ctx: StatsLlmContext): Promise<string | null> {
+  const system = await loadSystemPrompt("stats");
   const generated = await chatComplete(
     [
-      { role: "system", content: STATS_SYSTEM_PROMPT },
+      { role: "system", content: system },
       { role: "user", content: buildStatsUserPrompt(ctx) },
     ],
     "stats",
@@ -192,7 +192,6 @@ export async function generatePersonalStats(ctx: StatsLlmContext): Promise<strin
   return generated ? sanitizeStatsBody(generated) : null;
 }
 
-/** Strip template chrome if LLM echoed the old /stats layout. */
 export function sanitizeStatsBody(text: string): string {
   let body = text.trim();
   body = body.replace(/^📊\s*Статистика\s*·[^\n]*\n*/m, "");

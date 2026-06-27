@@ -33,14 +33,18 @@ export async function recordLlmGeneration(params: {
 export async function getRecentLlmGenerations(
   db: AppDatabase,
   chatId: number,
-  limit?: number,
+  options?: { kind?: LlmGenerationKind; limit?: number },
 ): Promise<Array<{ kind: string; text: string }>> {
-  const take = limit ?? env.LLM_STYLE_EXAMPLES;
+  const take = options?.limit ?? env.LLM_STYLE_EXAMPLES;
   const rows = await db.query.llmGenerations.findMany({
     where: eq(llmGenerations.chatId, chatId),
     orderBy: desc(llmGenerations.createdAt),
-    limit: take,
+    limit: take * 4,
   });
 
-  return rows.reverse().map((r) => ({ kind: r.kind, text: r.text }));
+  const filtered = options?.kind ? rows.filter((r) => r.kind === options.kind) : rows;
+  return filtered
+    .slice(0, take)
+    .reverse()
+    .map((r) => ({ kind: r.kind, text: r.text }));
 }
