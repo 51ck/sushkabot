@@ -62,11 +62,29 @@ describe("buildLlmRequestPayload", () => {
     expect(payload.extra_body).toBeUndefined();
   });
 
+  test("uses max_tokens for DeepSeek", () => {
+    const payload = buildLlmRequestPayload(
+      [{ role: "user", content: "hi" }],
+      "https://api.deepseek.com/v1",
+    );
+    expect(payload.max_tokens).toBe(1024);
+    expect(payload.max_completion_tokens).toBeUndefined();
+  });
+
   test("omits thinking for non-DeepSeek APIs", () => {
     const payload = buildLlmRequestPayload(
       [{ role: "user", content: "hi" }],
       "https://api.openai.com/v1",
     );
     expect(payload.thinking).toBeUndefined();
+  });
+
+  test("uses max_completion_tokens for non-DeepSeek APIs", () => {
+    const payload = buildLlmRequestPayload(
+      [{ role: "user", content: "hi" }],
+      "https://api.openai.com/v1",
+    );
+    expect(payload.max_completion_tokens).toBe(1024);
+    expect(payload.max_tokens).toBeUndefined();
   });
 });

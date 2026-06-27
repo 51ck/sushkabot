@@ -74,10 +74,11 @@ export function buildLlmRequestPayload(
   messages: ChatMessage[],
   apiBase = env.OPENAI_API_BASE,
 ): Record<string, unknown> {
+  const tokenKey = shouldDisableDeepSeekThinking(apiBase) ? "max_tokens" : "max_completion_tokens";
   const payload: Record<string, unknown> = {
     model: env.OPENAI_MODEL,
     temperature: 0.9,
-    max_completion_tokens: MAX_COMPLETION_TOKENS,
+    [tokenKey]: MAX_COMPLETION_TOKENS,
     messages,
   };
 
