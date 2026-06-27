@@ -25,8 +25,14 @@ function toastForStatus(status: CheckinStatus): string {
 
 export function registerCheckinHandlers(bot: Bot<BotContext>): void {
   bot.on("callback_query:data", async (ctx) => {
-    const key = parseCheckinCallback(ctx.callbackQuery.data);
-    if (!key) return;
+    const data = ctx.callbackQuery.data;
+    if (!data.startsWith("checkin:")) return;
+
+    const key = parseCheckinCallback(data);
+    if (!key) {
+      await ctx.answerCallbackQuery({ text: texts.checkinClosed });
+      return;
+    }
 
     if (!ctx.from || !ctx.chat || !isGroupChat(ctx)) {
       await ctx.answerCallbackQuery({ text: texts.checkinClosed });

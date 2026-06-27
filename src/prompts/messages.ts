@@ -1,5 +1,9 @@
 import type { LlmBaseContext } from "../services/llm-context.ts";
-import { applyContextBudget, buildBasePromptSections } from "../services/llm-context.ts";
+import {
+  applyContextBudget,
+  buildBasePromptSections,
+  formatScheduleBlock,
+} from "../services/llm-context.ts";
 import { formatQualityOneLiner } from "../services/streak-quality.ts";
 
 export interface CheckinLlmContext extends LlmBaseContext {
@@ -19,7 +23,7 @@ export interface SummaryLlmContext extends LlmBaseContext {
 }
 
 function trimContext<T extends LlmBaseContext>(ctx: T, fixedTail: string): T {
-  const fixed = [...buildBasePromptSections(ctx), "", fixedTail].join("\n");
+  const fixed = [formatScheduleBlock(ctx.schedule), "", fixedTail].join("\n");
   const trimmed = applyContextBudget({
     fixed,
     chatSnippets: ctx.chatSnippets,

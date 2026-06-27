@@ -1,6 +1,10 @@
 import type { StatsPromptPayload, WindowHighlightContext } from "../services/highlights.ts";
 import { formatHighlightsBlock, formatStatsBlock } from "../services/highlights.ts";
-import { applyContextBudget, buildBasePromptSections } from "../services/llm-context.ts";
+import {
+  applyContextBudget,
+  buildBasePromptSections,
+  formatScheduleBlock,
+} from "../services/llm-context.ts";
 import { formatQualityOneLiner } from "../services/streak-quality.ts";
 
 export function buildLiveWindowUserPrompt(ctx: WindowHighlightContext): string {
@@ -16,7 +20,7 @@ export function buildLiveWindowUserPrompt(ctx: WindowHighlightContext): string {
     "Перепиши приглашение к чек-ину: отрази новые ответы из highlights + зови остальных отметиться.",
   ].join("\n");
 
-  const fixed = [...buildBasePromptSections(ctx), "", tail].join("\n");
+  const fixed = [formatScheduleBlock(ctx.schedule), "", tail].join("\n");
   const trimmed = applyContextBudget({
     fixed,
     chatSnippets: ctx.chatSnippets,
@@ -61,7 +65,7 @@ export function buildStatsUserPrompt(ctx: StatsLlmContext): string {
     participants: ctx.participants,
   };
 
-  const fixed = [...buildBasePromptSections(baseCtx), "", tail].join("\n");
+  const fixed = [formatScheduleBlock(baseCtx.schedule), "", tail].join("\n");
   const trimmed = applyContextBudget({
     fixed,
     chatSnippets: ctx.chatSnippets,

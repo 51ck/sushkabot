@@ -60,12 +60,16 @@ export function registerCommonHandlers(bot: Bot<BotContext>): void {
       quality: quality.quality,
     });
 
-    const closesAt = DateTime.now().setZone(chat.timezone).plus({ hours: 2 });
+    const nowLocal = DateTime.now().setZone(chat.timezone);
+    const closesAt = nowLocal
+      .set({ hour: chat.checkinHour, minute: chat.checkinMinute, second: 0, millisecond: 0 })
+      .plus({ minutes: chat.windowDurationMinutes });
     const llmCtx = await buildLlmBaseContext({
       db: ctx.db,
       chat,
       asOfDate: today,
       closesAt,
+      now: nowLocal,
       kind: "stats",
     });
     const llmText = await generatePersonalStats({ ...llmCtx, statsPayload: payload });

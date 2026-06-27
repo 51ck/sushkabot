@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import type { DateTime } from "luxon";
+import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
 import type { LlmGenerationKind } from "../db/schema.ts";
 import { type Chat, chatMembers, members } from "../db/schema.ts";
@@ -58,7 +58,7 @@ export function buildChatScheduleContext(params: {
   now?: DateTime;
 }): ChatScheduleContext {
   const { chat, closesAt } = params;
-  const now = (params.now ?? closesAt).setZone(chat.timezone);
+  const now = (params.now ?? DateTime.utc()).setZone(chat.timezone);
   const checkinOpens = now.set({
     hour: chat.checkinHour,
     minute: chat.checkinMinute,
