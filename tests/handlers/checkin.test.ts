@@ -36,15 +36,16 @@ describe("checkin callback handler", () => {
         fetch: async (url: string | URL | Request, init?: RequestInit) => {
           const method = url.toString().split("/").pop() ?? "";
           apiCalls.push(method);
-          if (method === "editMessageText") {
+          if (method === "editMessageText" || method === "sendMessage") {
             const body = init?.body ? JSON.parse(String(init.body)) : {};
             return new Response(
               JSON.stringify({
                 ok: true,
                 result: {
-                  message_id: body.message_id ?? 100,
+                  message_id: body.message_id ?? 101,
                   date: 0,
-                  chat: { id: body.chat_id, type: "supergroup" },
+                  chat: { id: body.chat_id ?? -100999, type: "supergroup" },
+                  text: body.text ?? "",
                 },
               }),
               { headers: { "Content-Type": "application/json" } },
