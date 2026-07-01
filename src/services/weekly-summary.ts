@@ -70,7 +70,11 @@ export async function postWeeklySummary(params: {
   }
 
   const weekRange = `${fromDate} — ${toDate}`;
-  const generated = await generateWeeklySummaryText({ weekRange, memberStats, totalGroupSoberDays });
+  const generated = await generateWeeklySummaryText({
+    weekRange,
+    memberStats,
+    totalGroupSoberDays,
+  });
   const fallback = "Неделя прошла. Продолжаем 💪";
   const body = generated ?? fallback;
 

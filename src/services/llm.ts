@@ -13,8 +13,8 @@ import {
 } from "../prompts/messages.ts";
 import {
   buildWeeklyUserPrompt,
-  type WeeklyLlmContext,
   WEEKLY_SYSTEM_PROMPT,
+  type WeeklyLlmContext,
 } from "../prompts/weekly.ts";
 import { DEFAULT_QUESTION } from "../types.ts";
 import type { StatsPromptPayload, WindowHighlightContext } from "./highlights.ts";
