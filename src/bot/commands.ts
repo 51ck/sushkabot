@@ -12,6 +12,9 @@ export async function registerBotCommands(api: Api): Promise<void> {
     { command: "stats", description: "Твоя статистика и стрики" },
     { command: "pledge", description: "Заявить: сегодня красавчик" },
     { command: "board", description: "Моментум группы" },
+    { command: "rules", description: "Правила и как работает бот" },
+    { command: "join", description: "Начать отслеживание" },
+    { command: "leave", description: "Выйти из отслеживания" },
     { command: "help", description: "Список команд" },
   ];
 
