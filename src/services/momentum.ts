@@ -51,6 +51,10 @@ export function formatMomentumBoard(entries: MomentumEntry[]): string {
     .filter((e) => e.soberCurrent >= 7)
     .sort((a, b) => b.soberCurrent - a.soberCurrent);
 
+  const accelerating = entries
+    .filter((e) => e.soberCurrent >= 3 && e.soberCurrent < 7)
+    .sort((a, b) => b.soberCurrent - a.soberCurrent);
+
   const comebacks = entries.filter((e) => e.isComeback);
   const totalGroupSober = entries.reduce((sum, e) => sum + e.totalSoberDays, 0);
 
@@ -64,6 +68,14 @@ export function formatMomentumBoard(entries: MomentumEntry[]): string {
     }
   } else {
     lines.push("Пока без длинных серий — всё впереди 💪");
+  }
+
+  if (accelerating.length > 0) {
+    lines.push("");
+    lines.push("🚀 Разгоняются:");
+    for (const a of accelerating) {
+      lines.push(`  ${a.mention} — ${a.soberCurrent} дн.`);
+    }
   }
 
   if (comebacks.length > 0) {
@@ -82,6 +94,7 @@ export function formatMomentumBoard(entries: MomentumEntry[]): string {
 
 export function formatMomentumForLlm(entries: MomentumEntry[]): string {
   const streakers = entries.filter((e) => e.soberCurrent >= 7);
+  const accelerating = entries.filter((e) => e.soberCurrent >= 3 && e.soberCurrent < 7);
   const comebacks = entries.filter((e) => e.isComeback);
   const totalGroupSober = entries.reduce((sum, e) => sum + e.totalSoberDays, 0);
 
@@ -90,6 +103,11 @@ export function formatMomentumForLlm(entries: MomentumEntry[]): string {
   if (streakers.length > 0) {
     parts.push(
       `streaks_7plus: ${streakers.map((s) => `${s.mention}(${s.soberCurrent})`).join(", ")}`,
+    );
+  }
+  if (accelerating.length > 0) {
+    parts.push(
+      `streaks_3to6: ${accelerating.map((a) => `${a.mention}(${a.soberCurrent})`).join(", ")}`,
     );
   }
   if (comebacks.length > 0) {
