@@ -22,13 +22,13 @@ interface DmTimezoneSession {
 const dmSessions = new Map<number, DmTimezoneSession>();
 
 function dmTimezoneHeader(current: string | null): string[] {
-  const tz = current ?? "not set";
+  const tz = current ?? "не задан";
   return [
-    `🌍 Personal timezone`,
+    `🌍 Личный часовой пояс`,
     "",
-    `Current: ${tz}`,
+    `Текущий: ${tz}`,
     "",
-    "Used for display (scheduling is per-group).",
+    "Используется для отображения (расписание — общее для группы).",
   ];
 }
 
@@ -44,7 +44,7 @@ export function registerSettingsHandlers(bot: Bot<BotContext>): void {
     });
 
     const message = await ctx.reply(
-      [...dmTimezoneHeader(current?.timezoneOverride ?? null), "", "Pick a region."].join("\n"),
+      [...dmTimezoneHeader(current?.timezoneOverride ?? null), "", "Выбери регион."].join("\n"),
       { reply_markup: buildDmTimezoneKeyboard(current?.timezoneOverride ?? null) },
     );
 
@@ -60,7 +60,7 @@ export function registerSettingsHandlers(bot: Bot<BotContext>): void {
     const session = dmSessions.get(ctx.from.id);
     const messageId = ctx.callbackQuery.message?.message_id;
     if (!session || messageId !== session.messageId) {
-      await ctx.answerCallbackQuery({ text: "Run /settings again." });
+      await ctx.answerCallbackQuery({ text: "Запусти /settings снова." });
       return;
     }
 
@@ -73,7 +73,7 @@ export function registerSettingsHandlers(bot: Bot<BotContext>): void {
         ctx.api,
         ctx.chat.id,
         session.messageId,
-        [...dmTimezoneHeader(null), "", "Cleared. Pick a region to set a new one."].join("\n"),
+        [...dmTimezoneHeader(null), "", "Сброшено. Выбери регион для нового."].join("\n"),
         { reply_markup: buildDmTimezoneKeyboard(null) },
       );
       await ctx.answerCallbackQuery({ text: texts.settingsCleared });
@@ -91,7 +91,7 @@ export function registerSettingsHandlers(bot: Bot<BotContext>): void {
         ctx.api,
         ctx.chat.id,
         session.messageId,
-        [...dmTimezoneHeader(currentTz), "", "Pick a region."].join("\n"),
+        [...dmTimezoneHeader(currentTz), "", "Выбери регион."].join("\n"),
         { reply_markup: buildDmTimezoneKeyboard(currentTz) },
       );
       await ctx.answerCallbackQuery();
@@ -122,7 +122,7 @@ export function registerSettingsHandlers(bot: Bot<BotContext>): void {
         ctx.api,
         ctx.chat.id,
         session.messageId,
-        [...dmTimezoneHeader(parsed.iana), "", "Saved. Pick a region to change."].join("\n"),
+        [...dmTimezoneHeader(parsed.iana), "", "Сохранено. Выбери регион для смены."].join("\n"),
         { reply_markup: buildDmTimezoneKeyboard(parsed.iana) },
       );
       await ctx.answerCallbackQuery({ text: texts.settingsSaved });
@@ -134,7 +134,7 @@ export function registerSettingsHandlers(bot: Bot<BotContext>): void {
       await ctx.reply(texts.settingsDmOnly);
       return;
     }
-    await ctx.reply("Use /settings — timezone is picked with buttons now.");
+    await ctx.reply("Используй /settings — часовой пояс выбирается кнопками.");
   });
 }
 
