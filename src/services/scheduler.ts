@@ -7,6 +7,7 @@ import { type Chat, chats, type DailyWindow, dailyWindows } from "../db/schema.t
 import { cleanupExpiredBotPosts } from "./bot-posts.ts";
 import { sendNudge } from "./nudge.ts";
 import { cleanupOldPledges } from "./pledge.ts";
+import { postWeeklySummary } from "./weekly-summary.ts";
 import { closeWindow, openWindow, recoverStaleWindows } from "./window.ts";
 
 type CloseTimer = ReturnType<typeof setTimeout>;
@@ -15,6 +16,7 @@ export class SchedulerService {
   private openCrons = new Map<number, Cron>();
   private closeTimers = new Map<number, CloseTimer>();
   private nudgeTimers = new Map<number, CloseTimer>();
+  private weeklyCrons = new Map<number, Cron>();
   private maintenanceCron: Cron | null = null;
 
   constructor(
@@ -61,6 +63,26 @@ export class SchedulerService {
     });
 
     this.openCrons.set(chat.id, cron);
+
+    const existingWeekly = this.weeklyCrons.get(chat.id);
+    if (existingWeekly) existingWeekly.stop();
+
+    const weeklyCron = new Cron(
+      "0 9 * * 1",
+      { timezone: chat.timezone, protect: true },
+      async () => {
+        const fresh = await this.db.query.chats.findFirst({
+          where: eq(chats.id, chat.id),
+        });
+        if (!fresh?.enabled) return;
+        try {
+          await postWeeklySummary({ db: this.db, api: this.getApi(), chat: fresh });
+        } catch (err) {
+          console.error(`Weekly summary failed for chat ${chat.id}:`, err);
+        }
+      },
+    );
+    this.weeklyCrons.set(chat.id, weeklyCron);
   }
 
   unregisterChat(chatId: number): void {
@@ -78,6 +100,11 @@ export class SchedulerService {
     if (nudge) {
       clearTimeout(nudge);
       this.nudgeTimers.delete(chatId);
+    }
+    const weekly = this.weeklyCrons.get(chatId);
+    if (weekly) {
+      weekly.stop();
+      this.weeklyCrons.delete(chatId);
     }
   }
 
