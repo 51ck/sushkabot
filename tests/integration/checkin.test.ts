@@ -41,7 +41,7 @@ describe("members and checkins", () => {
 
     const [chat] = await db
       .insert(chats)
-      .values({ telegramChatId: "-1002", title: "G" })
+      .values({ telegramChatId: "-1002", title: "G", graceMinSoberDays: 0 })
       .returning();
     if (!chat) throw new Error("expected chat row");
 
@@ -94,7 +94,7 @@ describe("members and checkins", () => {
 
     const [chat] = await db
       .insert(chats)
-      .values({ telegramChatId: "-1003", title: "G" })
+      .values({ telegramChatId: "-1003", title: "G", graceMinSoberDays: 0 })
       .returning();
     if (!chat) throw new Error("expected chat row");
 
@@ -146,12 +146,50 @@ describe("members and checkins", () => {
     expect(status).toBe("major_slip");
   });
 
+  test("ostupilsya is major when sober streak below grace threshold", async () => {
+    const { db } = createTestDb();
+    const api = { editMessageText: async () => ({ message_id: 1 }) };
+
+    const [chat] = await db
+      .insert(chats)
+      .values({ telegramChatId: "-1005", title: "G", graceMinSoberDays: 7 })
+      .returning();
+    if (!chat) throw new Error("expected chat row");
+
+    const { memberId } = await ensureMember(db, { id: 88, first_name: "Dana" });
+    await joinChatMember(db, chat.id, memberId);
+
+    const [window] = await db
+      .insert(dailyWindows)
+      .values({
+        chatId: chat.id,
+        checkinDate: "2026-05-26",
+        windowOpensAt: "2026-05-26T21:00:00Z",
+        windowClosesAt: "2026-05-26T23:00:00Z",
+        messageId: 102,
+        status: "open",
+      })
+      .returning();
+    if (!window) throw new Error("expected window row");
+
+    const status = await recordCheckin({
+      db,
+      api: api as never,
+      chat,
+      window,
+      memberId,
+      buttonKey: "ostupilsya",
+    });
+
+    expect(status).toBe("major_slip");
+  });
+
   test("recordAbsentAsMinorSlip fills missing answers", async () => {
     const { db } = createTestDb();
 
     const [chat] = await db
       .insert(chats)
-      .values({ telegramChatId: "-1004", title: "G" })
+      .values({ telegramChatId: "-1004", title: "G", graceMinSoberDays: 0 })
       .returning();
     if (!chat) throw new Error("expected chat row");
 
@@ -180,7 +218,7 @@ describe("members and checkins", () => {
       status: "sober",
     });
 
-    const created = await recordAbsentAsMinorSlip({ db, chatId: chat.id, window });
+    const created = await recordAbsentAsMinorSlip({ db, chat, window });
     expect(created).toBe(1);
 
     const rows = await db.select().from(checkins).where(eq(checkins.dailyWindowId, window.id));

@@ -21,6 +21,7 @@ const baseChat: Chat = {
   responseMode: "sushka",
   buttonLabels: null,
   nudgeEnabled: false,
+  graceMinSoberDays: 7,
   enabled: true,
   createdAt: "2026-01-01",
 };

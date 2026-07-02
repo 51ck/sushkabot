@@ -17,7 +17,7 @@ export function registerWelcomeHandlers(bot: Bot<BotContext>): void {
       ? `${chat.checkinHour}:${String(chat.checkinMinute).padStart(2, "0")}`
       : undefined;
 
-    const msg = await ctx.reply(buildRulesText(timeStr));
+    const msg = await ctx.reply(buildRulesText(timeStr, chat?.graceMinSoberDays));
 
     if (chat) {
       await trackBotPost({
@@ -42,7 +42,7 @@ export function registerWelcomeHandlers(bot: Bot<BotContext>): void {
 
     for (const member of nonBotMembers) {
       const mention = member.username ? `@${member.username}` : member.first_name;
-      const text = `${mention}, привет! 👋\n\n${buildRulesText(timeStr)}`;
+      const text = `${mention}, привет! 👋\n\n${buildRulesText(timeStr, chat?.graceMinSoberDays)}`;
       const msg = await ctx.reply(text);
 
       if (chat) {

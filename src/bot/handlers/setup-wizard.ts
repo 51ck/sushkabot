@@ -4,10 +4,12 @@ import { chats } from "../../db/schema.ts";
 import { isAdmin } from "../../env.ts";
 import { upsertChat } from "../../services/window.ts";
 import { texts } from "../../texts.ts";
+import { DEFAULT_GRACE_MIN_SOBER_DAYS, formatGraceMinSoberDays } from "../../types.ts";
 import type { BotContext } from "../context.ts";
 import { isGroupChat, requireGroupAdmin } from "../context.ts";
 import {
   buildDurationKeyboard,
+  buildGraceKeyboard,
   buildMenuKeyboard,
   buildTimeKeyboard,
   buildTimezoneCityKeyboard,
@@ -26,6 +28,7 @@ export interface WizardDraft {
   timezone: string;
   windowDurationMinutes: number;
   nudgeEnabled: boolean;
+  graceMinSoberDays: number;
 }
 
 interface WizardSession {
@@ -52,6 +55,7 @@ function defaultDraft(): WizardDraft {
     timezone: "Europe/Moscow",
     windowDurationMinutes: 120,
     nudgeEnabled: false,
+    graceMinSoberDays: DEFAULT_GRACE_MIN_SOBER_DAYS,
   };
 }
 
@@ -62,6 +66,7 @@ function draftFromChat(chat: typeof chats.$inferSelect): WizardDraft {
     timezone: chat.timezone,
     windowDurationMinutes: chat.windowDurationMinutes,
     nudgeEnabled: chat.nudgeEnabled,
+    graceMinSoberDays: chat.graceMinSoberDays,
   };
 }
 
@@ -82,6 +87,7 @@ function buildMenuText(mode: "setup" | "config", draft: WizardDraft): string {
     `⏰ Время: ${formatTime(draft)}`,
     `🌍 Часовой пояс: ${draft.timezone}`,
     `⏳ Окно ответа: ${draft.windowDurationMinutes} мин`,
+    `🛡 Грейс: от ${formatGraceMinSoberDays(draft.graceMinSoberDays)} трезвости`,
     `🔔 Напоминалка: ${draft.nudgeEnabled ? "Вкл ✅" : "Выкл ❌"}`,
     "",
     "Вопрос и кнопки фиксированы: «Оступился сегодня?» + Красавчик / Оступился",
@@ -114,6 +120,14 @@ function buildScreenText(
         "",
         "Сколько времени можно ответить после открытия.",
       ].join("\n");
+    case "grace":
+      return [
+        `🛡 Грейс`,
+        "",
+        `Сейчас: от ${formatGraceMinSoberDays(draft.graceMinSoberDays)} трезвости`,
+        "",
+        "Сколько дней подряд нужно быть трезвым, чтобы первый срыв не сбил серию.",
+      ].join("\n");
     default:
       return "";
   }
@@ -133,6 +147,8 @@ function buildScreenKeyboard(
       return buildTimezoneCityKeyboard(timezoneRegion ?? "europe", draft.timezone);
     case "duration":
       return buildDurationKeyboard(draft.windowDurationMinutes);
+    case "grace":
+      return buildGraceKeyboard(draft.graceMinSoberDays);
     default:
       return buildMenuKeyboard(false);
   }
@@ -165,6 +181,7 @@ async function persistDraft(
       checkinMinute: draft.checkinMinute,
       windowDurationMinutes: draft.windowDurationMinutes,
       nudgeEnabled: draft.nudgeEnabled,
+      graceMinSoberDays: draft.graceMinSoberDays,
     });
     ctx.scheduler.registerChat(saved);
     session.dbChatId = saved.id;
@@ -180,6 +197,7 @@ async function persistDraft(
       checkinMinute: draft.checkinMinute,
       windowDurationMinutes: draft.windowDurationMinutes,
       nudgeEnabled: draft.nudgeEnabled,
+      graceMinSoberDays: draft.graceMinSoberDays,
     })
     .where(eq(chats.id, session.dbChatId))
     .returning();
@@ -331,6 +349,14 @@ export function registerSetupWizardHandlers(bot: Bot<BotContext>): void {
         await ctx.answerCallbackQuery({ text: `${parsed.minutes} мин` });
         return;
 
+      case "grace":
+        session.draft.graceMinSoberDays = parsed.days;
+        await applyFieldChange(ctx, session, true);
+        await ctx.answerCallbackQuery({
+          text: `Грейс: от ${formatGraceMinSoberDays(parsed.days)}`,
+        });
+        return;
+
       case "nudge":
         session.draft.nudgeEnabled = !session.draft.nudgeEnabled;
         await applyFieldChange(ctx, session, false);
@@ -371,6 +397,7 @@ export function registerSetupWizardHandlers(bot: Bot<BotContext>): void {
             "",
             `⏰ ${formatTime(session.draft)} ${session.draft.timezone}`,
             `⏳ окно ${session.draft.windowDurationMinutes} мин`,
+            `🛡 грейс от ${formatGraceMinSoberDays(session.draft.graceMinSoberDays)}`,
           ].join("\n"),
         );
         await ctx.answerCallbackQuery({ text: "Сохранено ✅" });

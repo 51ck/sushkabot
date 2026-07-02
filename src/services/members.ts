@@ -3,8 +3,8 @@ import type { Api } from "grammy";
 import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
 import { type Chat, chatMembers, chats, checkins, dailyWindows, members } from "../db/schema.ts";
-import { type CheckinButtonKey, type CheckinStatus, resolveCheckinStatus } from "../types.ts";
-import { getPreviousDayStatus } from "./checkin-status.ts";
+import type { CheckinButtonKey, CheckinStatus } from "../types.ts";
+import { resolveAbsentCheckinStatus, resolveMemberCheckinStatus } from "./checkin-status.ts";
 import { buildWindowHighlightContext, highlightsHash } from "./highlights.ts";
 import { generateLiveWindowBody } from "./llm.ts";
 import { recordLlmGeneration } from "./llm-generations.ts";
@@ -219,13 +219,14 @@ export async function recordCheckin(params: {
 }): Promise<CheckinStatus> {
   const { db, api, chat, window, memberId, buttonKey } = params;
 
-  const previousDayStatus = await getPreviousDayStatus({
+  const status = await resolveMemberCheckinStatus({
     db,
     chatId: chat.id,
     memberId,
     checkinDate: window.checkinDate,
+    buttonKey,
+    graceMinSoberDays: chat.graceMinSoberDays,
   });
-  const status = resolveCheckinStatus(buttonKey, previousDayStatus);
 
   const existing = await db.query.checkins.findFirst({
     where: and(eq(checkins.dailyWindowId, window.id), eq(checkins.memberId, memberId)),
@@ -253,10 +254,11 @@ export async function recordCheckin(params: {
 /** Joined members who never answered get «оступился» when the window closes. */
 export async function recordAbsentAsMinorSlip(params: {
   db: AppDatabase;
-  chatId: number;
+  chat: Chat;
   window: typeof dailyWindows.$inferSelect;
 }): Promise<number> {
-  const { db, chatId, window } = params;
+  const { db, chat, window } = params;
+  const chatId = chat.id;
 
   const joined = await db.query.chatMembers.findMany({
     where: and(eq(chatMembers.chatId, chatId), eq(chatMembers.active, true)),
@@ -271,12 +273,20 @@ export async function recordAbsentAsMinorSlip(params: {
   for (const member of joined) {
     if (answeredMemberIds.has(member.memberId)) continue;
 
+    const status = await resolveAbsentCheckinStatus({
+      db,
+      chatId,
+      memberId: member.memberId,
+      checkinDate: window.checkinDate,
+      graceMinSoberDays: chat.graceMinSoberDays,
+    });
+
     await db.insert(checkins).values({
       dailyWindowId: window.id,
       chatId,
       memberId: member.memberId,
       checkinDate: window.checkinDate,
-      status: "minor_slip",
+      status,
     });
     created += 1;
   }

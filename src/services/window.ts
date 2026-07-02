@@ -191,7 +191,7 @@ export async function closeWindow(params: {
     return;
   }
 
-  await recordAbsentAsMinorSlip({ db, chatId: chat.id, window });
+  await recordAbsentAsMinorSlip({ db, chat, window });
 
   const closesAt = DateTime.fromISO(window.windowClosesAt, { zone: "utc" });
   const answeredCount = await countAnswered(db, window.id);
@@ -265,6 +265,7 @@ export async function upsertChat(
     checkinMinute: number;
     windowDurationMinutes: number;
     nudgeEnabled?: boolean;
+    graceMinSoberDays?: number;
     questionText?: string;
     responseMode?: string;
     buttonLabels?: string | null;
@@ -273,6 +274,7 @@ export async function upsertChat(
   const payload = {
     ...data,
     nudgeEnabled: data.nudgeEnabled ?? false,
+    graceMinSoberDays: data.graceMinSoberDays ?? 7,
     questionText: data.questionText ?? "Оступился? Пидорнулся?",
     responseMode: data.responseMode ?? "sushka",
     buttonLabels: data.buttonLabels ?? null,

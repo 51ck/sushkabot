@@ -13,7 +13,7 @@ SQLite persistence via Drizzle ORM + `bun:sqlite`. Schema contract: [`../../docs
 
 ## Local Contracts
 
-**Core tables:** `chats`, `members`, `chat_members`, `daily_windows`, `checkins`, `bot_posts`, `chat_snippets`, `llm_generations`.
+**`chats`:** includes `grace_min_sober_days` (default 7) — sober streak required before grace on Оступился/silence
 
 **`checkins.status`:** `sober` | `minor_slip` | `major_slip`
 

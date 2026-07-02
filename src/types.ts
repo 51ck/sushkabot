@@ -15,6 +15,19 @@ export type WindowStatus = z.infer<typeof windowStatusSchema>;
 
 export const DEFAULT_QUESTION = "Оступился сегодня?";
 
+/** Sober streak length required before «Оступился» can store minor_slip (grace). */
+export const DEFAULT_GRACE_MIN_SOBER_DAYS = 7;
+
+export const GRACE_MIN_SOBER_DAY_OPTIONS = [0, 3, 7, 14, 30] as const;
+export type GraceMinSoberDaysOption = (typeof GRACE_MIN_SOBER_DAY_OPTIONS)[number];
+
+export function formatGraceMinSoberDays(days: number): string {
+  if (days === 0) return "с первого дня";
+  if (days === 1) return "1 день";
+  if (days >= 2 && days <= 4) return `${days} дня`;
+  return `${days} дней`;
+}
+
 export const DEFAULT_BUTTON_LABELS: Record<CheckinButtonKey, string> = {
   krasavchik: "💪 Красавчик",
   ostupilsya: "🍺 Оступился",
@@ -59,11 +72,13 @@ export function isEscalatingPriorStatus(status: CheckinStatus | null): boolean {
 export function resolveCheckinStatus(
   buttonKey: CheckinButtonKey,
   previousDayStatus: CheckinStatus | null,
+  soberStreakBeforeToday: number,
+  graceMinSoberDays: number,
 ): CheckinStatus {
-  if (buttonKey === "ostupilsya" && isEscalatingPriorStatus(previousDayStatus)) {
-    return "major_slip";
-  }
-  return buttonKeyToBaseStatus(buttonKey);
+  if (buttonKey === "krasavchik") return "sober";
+  if (isEscalatingPriorStatus(previousDayStatus)) return "major_slip";
+  if (soberStreakBeforeToday < graceMinSoberDays) return "major_slip";
+  return "minor_slip";
 }
 
 export function statusToEmoji(status: CheckinStatus | LegacyCheckinStatus): string {

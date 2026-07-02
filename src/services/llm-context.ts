@@ -42,6 +42,7 @@ export interface ChatScheduleContext {
   checkinOpens: string;
   windowCloses: string;
   windowDurationMinutes: number;
+  graceMinSoberDays: number;
   nowLocal: string;
 }
 
@@ -71,6 +72,7 @@ export function buildChatScheduleContext(params: {
     checkinOpens: checkinOpens.toFormat("HH:mm"),
     windowCloses: formatCloseTime(closesAt, chat.timezone),
     windowDurationMinutes: chat.windowDurationMinutes,
+    graceMinSoberDays: chat.graceMinSoberDays,
     nowLocal: now.toFormat("HH:mm"),
   };
 }
@@ -81,6 +83,7 @@ export function formatScheduleBlock(schedule: ChatScheduleContext): string {
     `checkin_opens: ${schedule.checkinOpens}`,
     `window_closes: ${schedule.windowCloses}`,
     `window_duration: ${schedule.windowDurationMinutes} min`,
+    `grace_min_sober_days: ${schedule.graceMinSoberDays}`,
     `now_local: ${schedule.nowLocal}`,
   ].join("\n");
 }

@@ -53,6 +53,7 @@ describe("llm-context formatters", () => {
       checkinOpens: "21:00",
       windowCloses: "23:00",
       windowDurationMinutes: 120,
+      graceMinSoberDays: 7,
       nowLocal: "21:30",
     });
     expect(block).toContain("timezone: Europe/Moscow");
