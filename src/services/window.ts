@@ -264,6 +264,7 @@ export async function upsertChat(
     checkinHour: number;
     checkinMinute: number;
     windowDurationMinutes: number;
+    nudgeEnabled?: boolean;
     questionText?: string;
     responseMode?: string;
     buttonLabels?: string | null;
@@ -271,7 +272,8 @@ export async function upsertChat(
 ): Promise<Chat> {
   const payload = {
     ...data,
-    questionText: data.questionText ?? "Оступился сегодня?",
+    nudgeEnabled: data.nudgeEnabled ?? false,
+    questionText: data.questionText ?? "Оступился? Пидорнулся?",
     responseMode: data.responseMode ?? "sushka",
     buttonLabels: data.buttonLabels ?? null,
     enabled: true as const,

@@ -25,6 +25,7 @@ export interface WizardDraft {
   checkinMinute: number;
   timezone: string;
   windowDurationMinutes: number;
+  nudgeEnabled: boolean;
 }
 
 interface WizardSession {
@@ -50,6 +51,7 @@ function defaultDraft(): WizardDraft {
     checkinMinute: 0,
     timezone: "Europe/Moscow",
     windowDurationMinutes: 120,
+    nudgeEnabled: false,
   };
 }
 
@@ -59,6 +61,7 @@ function draftFromChat(chat: typeof chats.$inferSelect): WizardDraft {
     checkinMinute: chat.checkinMinute,
     timezone: chat.timezone,
     windowDurationMinutes: chat.windowDurationMinutes,
+    nudgeEnabled: chat.nudgeEnabled,
   };
 }
 
@@ -79,6 +82,7 @@ function buildMenuText(mode: "setup" | "config", draft: WizardDraft): string {
     `⏰ Время: ${formatTime(draft)}`,
     `🌍 Часовой пояс: ${draft.timezone}`,
     `⏳ Окно ответа: ${draft.windowDurationMinutes} мин`,
+    `🔔 Напоминалка: ${draft.nudgeEnabled ? "Вкл ✅" : "Выкл ❌"}`,
     "",
     "Вопрос и кнопки фиксированы: «Оступился сегодня?» + Красавчик / Оступился",
   ].join("\n");
@@ -160,6 +164,7 @@ async function persistDraft(
       checkinHour: draft.checkinHour,
       checkinMinute: draft.checkinMinute,
       windowDurationMinutes: draft.windowDurationMinutes,
+      nudgeEnabled: draft.nudgeEnabled,
     });
     ctx.scheduler.registerChat(saved);
     session.dbChatId = saved.id;
@@ -174,6 +179,7 @@ async function persistDraft(
       checkinHour: draft.checkinHour,
       checkinMinute: draft.checkinMinute,
       windowDurationMinutes: draft.windowDurationMinutes,
+      nudgeEnabled: draft.nudgeEnabled,
     })
     .where(eq(chats.id, session.dbChatId))
     .returning();
@@ -190,7 +196,7 @@ async function renderSession(ctx: BotContext, session: WizardSession): Promise<v
       : buildScreenText(session.screen, session.draft, session.timezoneRegion);
   const keyboard =
     session.screen === "menu"
-      ? buildMenuKeyboard(session.mode === "setup")
+      ? buildMenuKeyboard(session.mode === "setup", session.draft.nudgeEnabled)
       : buildScreenKeyboard(session.screen, session.draft, session.timezoneRegion);
 
   await safeEditMessageText(ctx.api, Number(session.telegramChatId), session.messageId, text, {
@@ -323,6 +329,14 @@ export function registerSetupWizardHandlers(bot: Bot<BotContext>): void {
         session.draft.windowDurationMinutes = parsed.minutes;
         await applyFieldChange(ctx, session, true);
         await ctx.answerCallbackQuery({ text: `${parsed.minutes} мин` });
+        return;
+
+      case "nudge":
+        session.draft.nudgeEnabled = !session.draft.nudgeEnabled;
+        await applyFieldChange(ctx, session, false);
+        await ctx.answerCallbackQuery({
+          text: session.draft.nudgeEnabled ? "Напоминалка включена" : "Напоминалка выключена",
+        });
         return;
 
       case "back":

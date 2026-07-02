@@ -11,6 +11,7 @@ import { registerDevHandlers } from "./handlers/dev.ts";
 import { registerReactionHandlers } from "./handlers/reactions.ts";
 import { registerSettingsHandlers } from "./handlers/settings.ts";
 import { registerSetupWizardHandlers } from "./handlers/setup-wizard.ts";
+import { registerWelcomeHandlers } from "./handlers/welcome.ts";
 
 export function createBot(
   token: string,
@@ -33,6 +34,7 @@ export function createBot(
   registerSettingsHandlers(bot);
   registerCheckinHandlers(bot);
   registerDevHandlers(bot);
+  registerWelcomeHandlers(bot);
 
   bot.on("my_chat_member", async (ctx) => {
     const update = ctx.myChatMember;

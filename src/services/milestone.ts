@@ -9,7 +9,7 @@ import { calculateSoberStreak } from "./streak.ts";
 import { getMemberCheckinHistory } from "./summary.ts";
 import { formatMemberMention } from "./window-message.ts";
 
-const MILESTONES = [7, 30, 90] as const;
+const MILESTONES = [7, 14, 30, 60, 90] as const;
 
 interface MilestoneMember {
   mention: string;
@@ -56,7 +56,9 @@ export async function detectWindowMilestones(params: {
 
 const MILESTONE_FALLBACKS: Record<number, string> = {
   7: "Неделя трезвости — это уже привычка 💪",
+  14: "Две недели — уже система 🧱",
   30: "Месяц. Это уже серьёзно 🔥",
+  60: "Два месяца — это уже образ жизни 🔥",
   90: "90 дней — легенда 👑",
 };
 

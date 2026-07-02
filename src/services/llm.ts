@@ -11,6 +11,11 @@ import {
   type CheckinLlmContext,
   type SummaryLlmContext,
 } from "../prompts/messages.ts";
+import {
+  buildWeeklyUserPrompt,
+  WEEKLY_SYSTEM_PROMPT,
+  type WeeklyLlmContext,
+} from "../prompts/weekly.ts";
 import { DEFAULT_QUESTION } from "../types.ts";
 import type { StatsPromptPayload, WindowHighlightContext } from "./highlights.ts";
 
@@ -190,6 +195,16 @@ export async function generatePersonalStats(ctx: StatsLlmContext): Promise<strin
     "stats",
   );
   return generated ? sanitizeStatsBody(generated) : null;
+}
+
+export async function generateWeeklySummaryText(ctx: WeeklyLlmContext): Promise<string | null> {
+  return chatComplete(
+    [
+      { role: "system", content: WEEKLY_SYSTEM_PROMPT },
+      { role: "user", content: buildWeeklyUserPrompt(ctx) },
+    ],
+    "weekly",
+  );
 }
 
 export function sanitizeStatsBody(text: string): string {
