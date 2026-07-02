@@ -1,0 +1,18 @@
+{
+  "update_id": 9002,
+  "message": {
+    "message_id": 101,
+    "date": 1710000000,
+    "chat": {
+      "id": -100999,
+      "type": "supergroup",
+      "title": "Test Group"
+    },
+    "left_chat_member": {
+      "id": 123456,
+      "is_bot": false,
+      "first_name": "Alice",
+      "username": "alice"
+    }
+  }
+}

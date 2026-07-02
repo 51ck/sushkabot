@@ -4,6 +4,8 @@ Append-only history of product spec changes. Current spec: [`../SPEC.md`](../SPE
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 0.7.2 | 2026-07 | Auto roster removal when user leaves Telegram group |
+| 0.7.1 | 2026-07 | `/join` `/leave` handlers; explicit roster; early close when all joined answered |
 | 0.7.0 | 2026-07 | `grace_min_sober_days` per chat (default 7); grace gate on Оступился/silence; LLM schedule context |
 | 0.6.1 | 2026-07 | `/rules` text: two buttons only (no «Пидорнулся»); escalation wording; document `/rules` + welcome in §4–§5 |
 | 0.6.0 | 2026-06 | Agent-ready restructure: §2 Core Mechanics, two buttons, LLM system.md, schedule context, streak quality, chat hygiene (no proactive delete, summary reply), satellite docs |

@@ -20,6 +20,14 @@ describe("buildRulesText", () => {
     expect(buildRulesText(undefined, 0)).toContain("с первого дня");
   });
 
+  test("mentions join before check-in", () => {
+    expect(buildRulesText()).toContain("/join");
+  });
+
+  test("mentions auto-leave when leaving chat", () => {
+    expect(buildRulesText()).toContain("Вышел из чата");
+  });
+
   test("explains escalation", () => {
     const text = buildRulesText();
     expect(text).toContain("Повторный «Оступился» на следующий день");

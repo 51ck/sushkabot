@@ -85,12 +85,7 @@ export class SchedulerService {
     this.weeklyCrons.set(chat.id, weeklyCron);
   }
 
-  unregisterChat(chatId: number): void {
-    const cron = this.openCrons.get(chatId);
-    if (cron) {
-      cron.stop();
-      this.openCrons.delete(chatId);
-    }
+  cancelWindowTimers(chatId: number): void {
     const timer = this.closeTimers.get(chatId);
     if (timer) {
       clearTimeout(timer);
@@ -101,6 +96,15 @@ export class SchedulerService {
       clearTimeout(nudge);
       this.nudgeTimers.delete(chatId);
     }
+  }
+
+  unregisterChat(chatId: number): void {
+    const cron = this.openCrons.get(chatId);
+    if (cron) {
+      cron.stop();
+      this.openCrons.delete(chatId);
+    }
+    this.cancelWindowTimers(chatId);
     const weekly = this.weeklyCrons.get(chatId);
     if (weekly) {
       weekly.stop();
@@ -130,6 +134,7 @@ export class SchedulerService {
         api: this.getApi(),
         chat: freshChat,
         window: freshWindow,
+        scheduler: this,
       });
     }, delayMs);
 

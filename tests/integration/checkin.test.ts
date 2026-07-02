@@ -9,6 +9,7 @@ import {
   recordAbsentAsMinorSlip,
   recordCheckin,
 } from "../../src/services/members.ts";
+import { maybeCloseWindowIfComplete } from "../../src/services/window.ts";
 import { createTestDb } from "../helpers/db.ts";
 
 describe("members and checkins", () => {
@@ -225,5 +226,69 @@ describe("members and checkins", () => {
     expect(rows).toHaveLength(2);
     const silent = rows.find((r) => r.memberId === b);
     expect(silent?.status).toBe("minor_slip");
+  });
+
+  test("maybeCloseWindowIfComplete closes when all joined answered", async () => {
+    const { db } = createTestDb();
+    const api = {
+      editMessageText: async () => ({ message_id: 1 }),
+      sendMessage: async () => ({ message_id: 2 }),
+    };
+
+    const [chat] = await db
+      .insert(chats)
+      .values({ telegramChatId: "-1006", title: "G", graceMinSoberDays: 0 })
+      .returning();
+    if (!chat) throw new Error("expected chat row");
+
+    const { memberId: a } = await ensureMember(db, { id: 10, first_name: "A" });
+    const { memberId: b } = await ensureMember(db, { id: 11, first_name: "B" });
+    await joinChatMember(db, chat.id, a);
+    await joinChatMember(db, chat.id, b);
+
+    const [window] = await db
+      .insert(dailyWindows)
+      .values({
+        chatId: chat.id,
+        checkinDate: "2026-05-26",
+        windowOpensAt: "2026-05-26T21:00:00Z",
+        windowClosesAt: "2026-05-26T23:00:00Z",
+        messageId: 200,
+        status: "open",
+        generatedBody: "test",
+      })
+      .returning();
+    if (!window) throw new Error("expected window row");
+
+    await recordCheckin({
+      db,
+      api: api as never,
+      chat,
+      window,
+      memberId: a,
+      buttonKey: "krasavchik",
+    });
+    await recordCheckin({
+      db,
+      api: api as never,
+      chat,
+      window,
+      memberId: b,
+      buttonKey: "krasavchik",
+    });
+
+    const closed = await maybeCloseWindowIfComplete({
+      db,
+      api: api as never,
+      chat,
+      window,
+    });
+    expect(closed).toBe(true);
+
+    const updated = await db.query.dailyWindows.findFirst({
+      where: (w, { eq }) => eq(w.id, window.id),
+    });
+    expect(updated?.status).toBe("summarized");
+    expect(await countJoinedMembers(db, chat.id)).toBe(2);
   });
 });

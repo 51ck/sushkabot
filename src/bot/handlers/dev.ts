@@ -68,7 +68,7 @@ export function registerDevHandlers(bot: Bot<BotContext>): void {
       return;
     }
 
-    await closeWindow({ db: ctx.db, api: ctx.api, chat, window });
+    await closeWindow({ db: ctx.db, api: ctx.api, chat, window, scheduler: ctx.scheduler });
     await ctx.reply(texts.forceCloseDone);
   });
 }

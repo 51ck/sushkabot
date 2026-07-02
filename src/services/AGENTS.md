@@ -8,7 +8,7 @@ Business logic: window lifecycle, check-ins, streaks, scheduling, LLM orchestrat
 
 | Module | Role |
 |--------|------|
-| `window.ts` | `openWindow` / `closeWindow`; stale post cleanup on open |
+| `window.ts` | `openWindow` / `closeWindow` / `maybeCloseWindowIfComplete`; stale post cleanup on open |
 | `scheduler.ts` | Per-chat cron (open) + setTimeout (close) + minute cron (expired posts) |
 | `members.ts` | Roster, `recordCheckin`, live LLM refresh trigger |
 | `checkin-status.ts` | Prior-day status + grace-gated resolution |
@@ -24,6 +24,7 @@ Business logic: window lifecycle, check-ins, streaks, scheduling, LLM orchestrat
 | `chat-snippets.ts`, `llm-generations.ts`, `bot-posts.ts` | LLM context + post tracking |
 | `highlights.ts` | Live highlight helpers |
 | `rules.ts` | Static `/rules` + welcome copy (`buildRulesText`) |
+| `roster-lifecycle.ts` | Roster deactivate + early window close |
 
 Only `SchedulerService` is a class.
 

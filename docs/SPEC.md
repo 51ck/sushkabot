@@ -1,6 +1,6 @@
 # Sushkabot — Product Spec
 
-**Version:** 0.7.0 | **Changelog:** [`docs/changelog/SPEC.md`](changelog/SPEC.md) | **Deploy:** [`docs/DEPLOY.md`](DEPLOY.md)
+**Version:** 0.7.2 | **Changelog:** [`docs/changelog/SPEC.md`](changelog/SPEC.md) | **Deploy:** [`docs/DEPLOY.md`](DEPLOY.md)
 
 Agent-ready product contract. Prompt text: [`src/prompts/system.md`](../src/prompts/system.md). Backlog: [`docs/IDEAS.md`](IDEAS.md).
 
@@ -184,9 +184,11 @@ New member joins → welcome reply with same rules text as `/rules` (ephemeral T
 
 **Open:** insert/reuse `daily_windows`; LLM `generated_body`; post + buttons; schedule close (+ nudge at 50% if enabled).
 
-**Answer:** validate open + before deadline; auto-join roster; resolve status; upsert checkin; debounced edit + LLM live regen (`LLM_DEBOUNCE_MS`).
+**Answer:** validate open + before deadline + active roster (`/join`); resolve status; upsert checkin; debounced edit + LLM live regen (`LLM_DEBOUNCE_MS`). When all active joined members answered → close immediately (summary + milestones), cancel scheduled close.
 
-**Close:** auto `minor_slip` for silent joined members; edit window (never delete); status `closed`; post summary as **reply** to window; optional milestone posts; status `summarized`.
+**Roster:** `/join` adds tracking; `/leave` removes (past check-ins kept). Check-in buttons only for joined members. Leaving the Telegram group auto-removes from roster (same as `/leave`); rejoining the group does **not** auto-enroll — `/join` again.
+
+**Close:** auto absent status for silent joined members; edit window (never delete); status `closed`; post summary as **reply** to window; optional milestone posts; status `summarized`.
 
 **Message shape (window):**
 
@@ -221,6 +223,8 @@ Closed: same body + «Окно закрыто.»; buttons removed.
 | `/board` | Group | Anyone | Group momentum board |
 | `/pledge` | Group | Anyone | Daily commitment post |
 | `/rules` | Group | Anyone | Static rules: two buttons, grace/escalation, milestones; ephemeral TTL 24h |
+| `/join` | Group | Anyone | Join group tracking roster |
+| `/leave` | Group | Anyone | Leave roster; past check-ins kept |
 | `/help` | Anywhere | Anyone | Command list |
 | `/settings` | DM | Anyone | Personal timezone picker |
 | `/force_open` / `/force_close` | Group | Env admin | Dev only |
@@ -324,6 +328,11 @@ See [`README.md`](../README.md) for dev setup.
 | Case | Expected |
 |------|----------|
 | Re-tap while open | Update checkin; LLM regen if highlights changed |
+| All joined answered while open | Early close + summary |
+| Check-in tap without `/join` | Toast «не в списке»; no write |
+| `/leave` while open | Removed from roster; may trigger early close if rest answered |
+| Left Telegram group while on roster | Auto-removed from roster; may trigger early close; past check-ins kept |
+| Rejoined Telegram group | Not auto-enrolled; `/join` required |
 | Оступился after yesterday slip | `major_slip` |
 | Оступился with streak < grace_min | `major_slip` |
 | Silent at close | Same resolution as Оступился |

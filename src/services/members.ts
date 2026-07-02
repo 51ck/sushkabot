@@ -106,6 +106,42 @@ export async function countAnswered(db: AppDatabase, dailyWindowId: number): Pro
   return result[0]?.value ?? 0;
 }
 
+/** Check-ins from members still active on the roster (for early-close logic). */
+export async function countAnsweredActiveMembers(
+  db: AppDatabase,
+  chatId: number,
+  dailyWindowId: number,
+): Promise<number> {
+  const result = await db
+    .select({ value: count() })
+    .from(checkins)
+    .innerJoin(
+      chatMembers,
+      and(
+        eq(chatMembers.memberId, checkins.memberId),
+        eq(chatMembers.chatId, chatId),
+        eq(chatMembers.active, true),
+      ),
+    )
+    .where(eq(checkins.dailyWindowId, dailyWindowId));
+  return result[0]?.value ?? 0;
+}
+
+export async function isActiveChatMember(
+  db: AppDatabase,
+  chatId: number,
+  memberId: number,
+): Promise<boolean> {
+  const row = await db.query.chatMembers.findFirst({
+    where: and(
+      eq(chatMembers.chatId, chatId),
+      eq(chatMembers.memberId, memberId),
+      eq(chatMembers.active, true),
+    ),
+  });
+  return !!row;
+}
+
 export async function getOpenWindow(
   db: AppDatabase,
   chatId: number,

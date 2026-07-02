@@ -6,9 +6,10 @@ import { buildStatsPayload } from "../../services/highlights.ts";
 import { formatStatsFallback, generatePersonalStats } from "../../services/llm.ts";
 import { buildLlmBaseContext } from "../../services/llm-context.ts";
 import { recordLlmGeneration } from "../../services/llm-generations.ts";
-import { ensureMember, getChatByTelegramId } from "../../services/members.ts";
+import { ensureMember, getChatByTelegramId, joinChatMember } from "../../services/members.ts";
 import { buildGroupMomentum, formatMomentumBoard } from "../../services/momentum.ts";
 import { postPledge } from "../../services/pledge.ts";
+import { deactivateRosterMember } from "../../services/roster-lifecycle.ts";
 import { buildMemberStats } from "../../services/streak.ts";
 import { computeStreakQuality } from "../../services/streak-quality.ts";
 import { getMemberCheckinHistory } from "../../services/summary.ts";
@@ -20,6 +21,60 @@ import { isGroupChat } from "../context.ts";
 export function registerCommonHandlers(bot: Bot<BotContext>): void {
   bot.command("help", async (ctx) => {
     await ctx.reply(texts.help);
+  });
+
+  bot.command("join", async (ctx) => {
+    if (!isGroupChat(ctx) || !ctx.from || !ctx.chat) {
+      await ctx.reply(texts.notGroup);
+      return;
+    }
+
+    const chat = await getChatByTelegramId(ctx.db, String(ctx.chat.id));
+    if (!chat) {
+      await ctx.reply(texts.notConfigured);
+      return;
+    }
+
+    const { memberId } = await ensureMember(ctx.db, ctx.from);
+    const existing = await ctx.db.query.chatMembers.findFirst({
+      where: (cm, { and, eq }) =>
+        and(eq(cm.chatId, chat.id), eq(cm.memberId, memberId), eq(cm.active, true)),
+    });
+    if (existing) {
+      await ctx.reply(texts.alreadyJoined);
+      return;
+    }
+
+    await joinChatMember(ctx.db, chat.id, memberId);
+    await ctx.reply(texts.joinSuccess);
+  });
+
+  bot.command("leave", async (ctx) => {
+    if (!isGroupChat(ctx) || !ctx.from || !ctx.chat) {
+      await ctx.reply(texts.notGroup);
+      return;
+    }
+
+    const chat = await getChatByTelegramId(ctx.db, String(ctx.chat.id));
+    if (!chat) {
+      await ctx.reply(texts.notConfigured);
+      return;
+    }
+
+    const { memberId } = await ensureMember(ctx.db, ctx.from);
+    const removed = await deactivateRosterMember({
+      db: ctx.db,
+      api: ctx.api,
+      chat,
+      memberId,
+      scheduler: ctx.scheduler,
+    });
+    if (!removed) {
+      await ctx.reply(texts.notJoined);
+      return;
+    }
+
+    await ctx.reply(texts.leaveSuccess);
   });
 
   bot.command("stats", async (ctx) => {
