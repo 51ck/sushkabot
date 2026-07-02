@@ -7,7 +7,12 @@ import { trackBotPost } from "./bot-posts.ts";
 import { generateCheckinBody, isLlmFallbackText } from "./llm.ts";
 import { buildLlmBaseContext } from "./llm-context.ts";
 import { recordLlmGeneration } from "./llm-generations.ts";
-import { countAnswered, countJoinedMembers, recordAbsentAsMinorSlip } from "./members.ts";
+import {
+  countAnswered,
+  countAnsweredActiveMembers,
+  countJoinedMembers,
+  recordAbsentAsMinorSlip,
+} from "./members.ts";
 import { postMilestoneCelebrations } from "./milestone.ts";
 import type { SchedulerService } from "./scheduler.ts";
 import { postSummary } from "./summary.ts";
@@ -181,8 +186,9 @@ export async function closeWindow(params: {
   api: Api;
   chat: Chat;
   window: typeof dailyWindows.$inferSelect;
+  scheduler?: SchedulerService;
 }): Promise<void> {
-  const { db, api, chat, window } = params;
+  const { db, api, chat, window, scheduler } = params;
 
   if (window.status !== "open") {
     if (window.status === "closed") {
@@ -191,7 +197,9 @@ export async function closeWindow(params: {
     return;
   }
 
-  await recordAbsentAsMinorSlip({ db, chatId: chat.id, window });
+  scheduler?.cancelWindowTimers(chat.id);
+
+  await recordAbsentAsMinorSlip({ db, chat, window });
 
   const closesAt = DateTime.fromISO(window.windowClosesAt, { zone: "utc" });
   const answeredCount = await countAnswered(db, window.id);
@@ -227,6 +235,27 @@ export async function closeWindow(params: {
   }
 
   await db.update(dailyWindows).set({ status: "summarized" }).where(eq(dailyWindows.id, window.id));
+}
+
+export async function maybeCloseWindowIfComplete(params: {
+  db: AppDatabase;
+  api: Api;
+  chat: Chat;
+  window: typeof dailyWindows.$inferSelect;
+  scheduler?: SchedulerService;
+}): Promise<boolean> {
+  const { db, api, chat, window, scheduler } = params;
+  if (window.status !== "open") return false;
+
+  const [answered, joined] = await Promise.all([
+    countAnsweredActiveMembers(db, chat.id, window.id),
+    countJoinedMembers(db, chat.id),
+  ]);
+
+  if (joined === 0 || answered < joined) return false;
+
+  await closeWindow({ db, api, chat, window, scheduler });
+  return true;
 }
 
 export async function recoverStaleWindows(params: {
@@ -265,6 +294,7 @@ export async function upsertChat(
     checkinMinute: number;
     windowDurationMinutes: number;
     nudgeEnabled?: boolean;
+    graceMinSoberDays?: number;
     questionText?: string;
     responseMode?: string;
     buttonLabels?: string | null;
@@ -273,6 +303,7 @@ export async function upsertChat(
   const payload = {
     ...data,
     nudgeEnabled: data.nudgeEnabled ?? false,
+    graceMinSoberDays: data.graceMinSoberDays ?? 7,
     questionText: data.questionText ?? "Оступился? Пидорнулся?",
     responseMode: data.responseMode ?? "sushka",
     buttonLabels: data.buttonLabels ?? null,

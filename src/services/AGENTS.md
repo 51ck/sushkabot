@@ -8,10 +8,10 @@ Business logic: window lifecycle, check-ins, streaks, scheduling, LLM orchestrat
 
 | Module | Role |
 |--------|------|
-| `window.ts` | `openWindow` / `closeWindow`; stale post cleanup on open |
+| `window.ts` | `openWindow` / `closeWindow` / `maybeCloseWindowIfComplete`; stale post cleanup on open |
 | `scheduler.ts` | Per-chat cron (open) + setTimeout (close) + minute cron (expired posts) |
 | `members.ts` | Roster, `recordCheckin`, live LLM refresh trigger |
-| `checkin-status.ts` | `resolveCheckinStatus` escalation rules |
+| `checkin-status.ts` | Prior-day status + grace-gated resolution |
 | `streak.ts` | Dual sober/intox streaks, `detectTodayEvent` |
 | `streak-quality.ts` | Pattern, quality, hollow milestones |
 | `llm.ts` | OpenAI-compatible client; DeepSeek `thinking: disabled` |
@@ -22,7 +22,9 @@ Business logic: window lifecycle, check-ins, streaks, scheduling, LLM orchestrat
 | `window-message.ts` | Window body shape + footer |
 | `milestone.ts`, `nudge.ts`, `momentum.ts`, `pledge.ts` | Retention hooks (SPEC §4.3) |
 | `chat-snippets.ts`, `llm-generations.ts`, `bot-posts.ts` | LLM context + post tracking |
-| `highlights.ts`, `rules.ts` | Live highlight helpers |
+| `highlights.ts` | Live highlight helpers |
+| `rules.ts` | Static `/rules` + welcome copy (`buildRulesText`) |
+| `roster-lifecycle.ts` | Roster deactivate + early window close |
 
 Only `SchedulerService` is a class.
 

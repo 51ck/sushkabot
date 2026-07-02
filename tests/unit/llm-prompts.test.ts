@@ -20,6 +20,7 @@ const baseLlmContext: LlmBaseContext = {
     checkinOpens: "21:00",
     windowCloses: "23:00",
     windowDurationMinutes: 120,
+    graceMinSoberDays: 7,
     nowLocal: "21:15",
   },
   styleExamples: [{ kind: "live", text: "prior generation sample" }],
@@ -74,6 +75,7 @@ const liveContext: WindowHighlightContext = {
 function expectSharedSections(prompt: string): void {
   expect(prompt).toContain("## Расписание");
   expect(prompt).toContain("window_closes: 23:00");
+  expect(prompt).toContain("grace_min_sober_days: 7");
   expect(prompt).toContain("## Примеры прошлых генераций");
   expect(prompt).toContain("prior generation sample");
   expect(prompt).toContain("## Недавний чат");

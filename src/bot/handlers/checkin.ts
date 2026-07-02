@@ -1,14 +1,12 @@
 import type { Bot } from "grammy";
 import { DateTime } from "luxon";
 import {
-  countAnswered,
-  countJoinedMembers,
   ensureMember,
   getChatByTelegramId,
-  joinChatMember,
+  isActiveChatMember,
   recordCheckin,
 } from "../../services/members.ts";
-import { closeWindow } from "../../services/window.ts";
+import { maybeCloseWindowIfComplete } from "../../services/window.ts";
 import { texts } from "../../texts.ts";
 import type { CheckinStatus } from "../../types.ts";
 import type { BotContext } from "../context.ts";
@@ -65,7 +63,10 @@ export function registerCheckinHandlers(bot: Bot<BotContext>): void {
     }
 
     const { memberId } = await ensureMember(ctx.db, ctx.from);
-    await joinChatMember(ctx.db, chat.id, memberId);
+    if (!(await isActiveChatMember(ctx.db, chat.id, memberId))) {
+      await ctx.answerCallbackQuery({ text: texts.notJoined });
+      return;
+    }
 
     const status = await recordCheckin({
       db: ctx.db,
@@ -78,12 +79,12 @@ export function registerCheckinHandlers(bot: Bot<BotContext>): void {
 
     await ctx.answerCallbackQuery({ text: toastForStatus(status) });
 
-    const [answered, joined] = await Promise.all([
-      countAnswered(ctx.db, window.id),
-      countJoinedMembers(ctx.db, chat.id),
-    ]);
-    if (joined > 0 && answered >= joined) {
-      await closeWindow({ db: ctx.db, api: ctx.api, chat, window });
-    }
+    await maybeCloseWindowIfComplete({
+      db: ctx.db,
+      api: ctx.api,
+      chat,
+      window,
+      scheduler: ctx.scheduler,
+    });
   });
 }

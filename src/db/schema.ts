@@ -15,6 +15,7 @@ export const chats = sqliteTable(
     responseMode: text("response_mode").notNull().default("sushka"),
     buttonLabels: text("button_labels"),
     nudgeEnabled: integer("nudge_enabled", { mode: "boolean" }).notNull().default(false),
+    graceMinSoberDays: integer("grace_min_sober_days").notNull().default(7),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
     createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   },

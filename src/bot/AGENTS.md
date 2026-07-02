@@ -31,6 +31,10 @@ Chat-log before checkin (reply tracking on bot posts).
 
 **Check-in statuses** (resolved in `services/checkin-status.ts`, types in `types.ts`): `sober`, `minor_slip`, `major_slip`. Legacy `slip`/`skipped` normalized at read.
 
+**Roster:** `/join` / `/leave` in `handlers/common.ts`. Check-in requires active roster; early close via `maybeCloseWindowIfComplete` when all joined answered.
+
+**Welcome:** `handlers/welcome.ts` — `/rules`, `new_chat_members`, `left_chat_member` (auto roster removal).
+
 **Dev commands** (`handlers/dev.ts`): `/force_open`, `/force_close` only when `BOT_ENV=development`.
 
 ## Work Guidance

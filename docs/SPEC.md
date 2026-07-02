@@ -1,6 +1,6 @@
 # Sushkabot — Product Spec
 
-**Version:** 0.6.0 | **Changelog:** [`docs/changelog/SPEC.md`](changelog/SPEC.md) | **Deploy:** [`docs/DEPLOY.md`](DEPLOY.md)
+**Version:** 0.7.2 | **Changelog:** [`docs/changelog/SPEC.md`](changelog/SPEC.md) | **Deploy:** [`docs/DEPLOY.md`](DEPLOY.md)
 
 Agent-ready product contract. Prompt text: [`src/prompts/system.md`](../src/prompts/system.md). Backlog: [`docs/IDEAS.md`](IDEAS.md).
 
@@ -43,16 +43,19 @@ Two fixed buttons for all chats. Callback prefix `checkin:`.
 | 💪 Красавчик | `krasavchik` | `sober` |
 | 🍺 Оступился | `ostupilsya` | `minor_slip` (may escalate) |
 
-No «Пидорнулся» button. `major_slip` only via escalation or legacy rows.
+No «Пидорнулся» button. `major_slip` only via escalation, grace gate, or legacy rows.
+
+**Grace gate** (`chats.grace_min_sober_days`, default 7): «Оступился» / silence stores `minor_slip` only when sober streak **as of yesterday** ≥ threshold; otherwise `major_slip` (streak breaks). `0` = grace from first sober day (legacy).
 
 **Resolution** (`resolveCheckinStatus`):
 
 | Action | Condition | Stored status | Streak effect |
 |--------|-----------|---------------|---------------|
 | Красавчик | always | `sober` | +1 sober streak |
-| Оступился | yesterday sober or no record | `minor_slip` | Grace: streak preserved, day not counted |
+| Оступился | yesterday sober or no record; streak ≥ grace_min | `minor_slip` | Grace: streak preserved, day not counted |
+| Оступился | yesterday sober or no record; streak < grace_min | `major_slip` | Sober streak broken |
 | Оступился | yesterday `minor_slip` or `major_slip` | `major_slip` | Sober streak broken |
-| Silence until close | joined member, no tap | `minor_slip` | Same as Оступился |
+| Silence until close | joined member, no tap | same as Оступился | Grace gate applies |
 | Re-tap while open | — | overwrites | recalc |
 
 Legacy DB: `slip` → `major_slip`, `skipped` → `minor_slip` (`normalizeCheckinStatus`).
@@ -144,7 +147,7 @@ LLM failure → keep prior body or static fallback; never crash.
 - Settings wizard (`/setup`, `/config`): time, timezone, window duration
 - Daily open/close window; two check-in buttons
 - LLM: open, live, summary, `/stats` — shared context (schedule, snippets, roster+quality, style examples)
-- Commands: `/stats`, `/board`, `/pledge`, `/help`; DM `/settings` timezone
+- Commands: `/stats`, `/board`, `/pledge`, `/rules`, `/help`; DM `/settings` timezone
 - Mid-window nudge when `nudge_enabled` (50% of window elapsed)
 - Milestone posts at 7/30/90 sober days on window close
 - Dual streaks, streak quality, hollow milestones
@@ -173,15 +176,19 @@ LLM failure → keep prior body or static fallback; never crash.
 
 ### 4.1 Onboarding
 
-Admin `/setup` or `/config` → inline wizard (one message, in-place edits). Defaults: 21:00, Europe/Moscow, 120 min. Save registers scheduler. Question/buttons not configurable.
+Admin `/setup` or `/config` → inline wizard (one message, in-place edits). Defaults: 21:00, Europe/Moscow, 120 min window, grace after 7 sober days. Save registers scheduler. Question/buttons not configurable.
+
+New member joins → welcome reply with same rules text as `/rules` (ephemeral TTL 4h). `/rules` → static rules text with chat check-in time when configured (ephemeral TTL 24h).
 
 ### 4.2 Check-in window
 
 **Open:** insert/reuse `daily_windows`; LLM `generated_body`; post + buttons; schedule close (+ nudge at 50% if enabled).
 
-**Answer:** validate open + before deadline; auto-join roster; resolve status; upsert checkin; debounced edit + LLM live regen (`LLM_DEBOUNCE_MS`).
+**Answer:** validate open + before deadline + active roster (`/join`); resolve status; upsert checkin; debounced edit + LLM live regen (`LLM_DEBOUNCE_MS`). When all active joined members answered → close immediately (summary + milestones), cancel scheduled close.
 
-**Close:** auto `minor_slip` for silent joined members; edit window (never delete); status `closed`; post summary as **reply** to window; optional milestone posts; status `summarized`.
+**Roster:** `/join` adds tracking; `/leave` removes (past check-ins kept). Check-in buttons only for joined members. Leaving the Telegram group auto-removes from roster (same as `/leave`); rejoining the group does **not** auto-enroll — `/join` again.
+
+**Close:** auto absent status for silent joined members; edit window (never delete); status `closed`; post summary as **reply** to window; optional milestone posts; status `summarized`.
 
 **Message shape (window):**
 
@@ -215,13 +222,16 @@ Closed: same body + «Окно закрыто.»; buttons removed.
 | `/stats` | Group | Anyone | Personal LLM stats; ephemeral TTL |
 | `/board` | Group | Anyone | Group momentum board |
 | `/pledge` | Group | Anyone | Daily commitment post |
+| `/rules` | Group | Anyone | Static rules: two buttons, grace/escalation, milestones; ephemeral TTL 24h |
+| `/join` | Group | Anyone | Join group tracking roster |
+| `/leave` | Group | Anyone | Leave roster; past check-ins kept |
 | `/help` | Anywhere | Anyone | Command list |
 | `/settings` | DM | Anyone | Personal timezone picker |
 | `/force_open` / `/force_close` | Group | Env admin | Dev only |
 
 **Telegram requirements:** supergroup admin (delete for `/stats` TTL); Privacy Mode off; post + edit messages.
 
-**Menu (`setMyCommands`):** group — stats, board, pledge, help; admins — + setup, config; DM — settings, help.
+**Menu (`setMyCommands`):** group — stats, pledge, board, rules, join, leave, help; admins — + setup, config (+ dev force_open/close); DM — settings, help.
 
 ---
 
@@ -244,7 +254,7 @@ Built by `buildLlmBaseContext()` + kind filters; trimmed by `trimContextToBudget
 
 | Block | Source | Notes |
 |-------|--------|-------|
-| Schedule | `chats` + window | timezone, checkin_opens, window_closes (local HH:mm), duration |
+| Schedule | `chats` + window | timezone, checkin_opens, window_closes (local HH:mm), duration, grace_min_sober_days |
 | Style examples | `llm_generations` | kind-filtered, limit `LLM_STYLE_EXAMPLES` |
 | Chat snippets | `chat_snippets` | up to `LLM_CHAT_CONTEXT_COUNT`, trimmed per snippet |
 | Roster | active members + streak quality | compact one-liners; live = unanswered + notable |
@@ -281,7 +291,7 @@ Migrations in `drizzle/*.sql`; auto on bot start.
 
 | Level | Fields |
 |-------|--------|
-| Chat | `checkin_hour`, `checkin_minute`, `window_duration_minutes`, `timezone`, `enabled`, `nudge_enabled` |
+| Chat | `checkin_hour`, `checkin_minute`, `window_duration_minutes`, `timezone`, `enabled`, `nudge_enabled`, `grace_min_sober_days` |
 | Person | `timezone_override` (display only, not cron) |
 
 Window may cross midnight; `checkin_date` stays open day. Second cron same day: no-op if summarized.
@@ -318,8 +328,14 @@ See [`README.md`](../README.md) for dev setup.
 | Case | Expected |
 |------|----------|
 | Re-tap while open | Update checkin; LLM regen if highlights changed |
+| All joined answered while open | Early close + summary |
+| Check-in tap without `/join` | Toast «не в списке»; no write |
+| `/leave` while open | Removed from roster; may trigger early close if rest answered |
+| Left Telegram group while on roster | Auto-removed from roster; may trigger early close; past check-ins kept |
+| Rejoined Telegram group | Not auto-enrolled; `/join` required |
 | Оступился after yesterday slip | `major_slip` |
-| Silent at close | Auto `minor_slip` |
+| Оступился with streak < grace_min | `major_slip` |
+| Silent at close | Same resolution as Оступился |
 | Tap after deadline | Toast «Окно закрыто»; no write |
 | Bot restart mid-window | Re-schedule close; no duplicate post |
 | LLM timeout | Prior body or fallback |

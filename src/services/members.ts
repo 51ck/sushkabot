@@ -3,8 +3,8 @@ import type { Api } from "grammy";
 import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
 import { type Chat, chatMembers, chats, checkins, dailyWindows, members } from "../db/schema.ts";
-import { type CheckinButtonKey, type CheckinStatus, resolveCheckinStatus } from "../types.ts";
-import { getPreviousDayStatus } from "./checkin-status.ts";
+import type { CheckinButtonKey, CheckinStatus } from "../types.ts";
+import { resolveAbsentCheckinStatus, resolveMemberCheckinStatus } from "./checkin-status.ts";
 import { buildWindowHighlightContext, highlightsHash } from "./highlights.ts";
 import { generateLiveWindowBody } from "./llm.ts";
 import { recordLlmGeneration } from "./llm-generations.ts";
@@ -104,6 +104,42 @@ export async function countAnswered(db: AppDatabase, dailyWindowId: number): Pro
     .from(checkins)
     .where(eq(checkins.dailyWindowId, dailyWindowId));
   return result[0]?.value ?? 0;
+}
+
+/** Check-ins from members still active on the roster (for early-close logic). */
+export async function countAnsweredActiveMembers(
+  db: AppDatabase,
+  chatId: number,
+  dailyWindowId: number,
+): Promise<number> {
+  const result = await db
+    .select({ value: count() })
+    .from(checkins)
+    .innerJoin(
+      chatMembers,
+      and(
+        eq(chatMembers.memberId, checkins.memberId),
+        eq(chatMembers.chatId, chatId),
+        eq(chatMembers.active, true),
+      ),
+    )
+    .where(eq(checkins.dailyWindowId, dailyWindowId));
+  return result[0]?.value ?? 0;
+}
+
+export async function isActiveChatMember(
+  db: AppDatabase,
+  chatId: number,
+  memberId: number,
+): Promise<boolean> {
+  const row = await db.query.chatMembers.findFirst({
+    where: and(
+      eq(chatMembers.chatId, chatId),
+      eq(chatMembers.memberId, memberId),
+      eq(chatMembers.active, true),
+    ),
+  });
+  return !!row;
 }
 
 export async function getOpenWindow(
@@ -219,13 +255,14 @@ export async function recordCheckin(params: {
 }): Promise<CheckinStatus> {
   const { db, api, chat, window, memberId, buttonKey } = params;
 
-  const previousDayStatus = await getPreviousDayStatus({
+  const status = await resolveMemberCheckinStatus({
     db,
     chatId: chat.id,
     memberId,
     checkinDate: window.checkinDate,
+    buttonKey,
+    graceMinSoberDays: chat.graceMinSoberDays,
   });
-  const status = resolveCheckinStatus(buttonKey, previousDayStatus);
 
   const existing = await db.query.checkins.findFirst({
     where: and(eq(checkins.dailyWindowId, window.id), eq(checkins.memberId, memberId)),
@@ -253,10 +290,11 @@ export async function recordCheckin(params: {
 /** Joined members who never answered get «оступился» when the window closes. */
 export async function recordAbsentAsMinorSlip(params: {
   db: AppDatabase;
-  chatId: number;
+  chat: Chat;
   window: typeof dailyWindows.$inferSelect;
 }): Promise<number> {
-  const { db, chatId, window } = params;
+  const { db, chat, window } = params;
+  const chatId = chat.id;
 
   const joined = await db.query.chatMembers.findMany({
     where: and(eq(chatMembers.chatId, chatId), eq(chatMembers.active, true)),
@@ -271,12 +309,20 @@ export async function recordAbsentAsMinorSlip(params: {
   for (const member of joined) {
     if (answeredMemberIds.has(member.memberId)) continue;
 
+    const status = await resolveAbsentCheckinStatus({
+      db,
+      chatId,
+      memberId: member.memberId,
+      checkinDate: window.checkinDate,
+      graceMinSoberDays: chat.graceMinSoberDays,
+    });
+
     await db.insert(checkins).values({
       dailyWindowId: window.id,
       chatId,
       memberId: member.memberId,
       checkinDate: window.checkinDate,
-      status: "minor_slip",
+      status,
     });
     created += 1;
   }
