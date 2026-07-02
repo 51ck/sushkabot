@@ -2,36 +2,9 @@
 
 Guidance for Claude Code (claude.ai/code) in this repo.
 
-## Spec First
+## DOX + Spec First
 
-Behavior/flow/command/LLM prompt/schema/env change:
-
-1. **Update spec first** — edit [`docs/SPEC.md`](docs/SPEC.md): version note if needed, affected sections, edge cases.
-2. **Then implement** — code, migrations, tests follow spec.
-3. **Keep in sync** — drift mid-task → fix spec or code.
-
-### Skip spec update only when
-
-- Pure refactor, zero behavior change
-- Typo/formatting in non-spec files
-- User says spec later
-
-### Spec touch checklist
-
-- §3 scope (in/out of scope)
-- §4 flows if UX changes
-- §7 messages/LLM if copy or generation changes
-- §9 schema if tables/columns change
-- §11 env if new variables
-- §12 edge cases for new branches
-- Appendix A file map for new modules
-
-### Example
-
-```
-BAD:  add closeWindow delete logic → commit → maybe update SPEC
-GOOD: SPEC §4.2 + §7.5 describe delete-on-close rules → then window.ts + tests
-```
+Read [`AGENTS.md`](AGENTS.md) DOX chain before editing. Behavior changes: update [`docs/SPEC.md`](docs/SPEC.md) first per [`docs/AGENTS.md`](docs/AGENTS.md), then implement. Closeout: sync SPEC + nearest `AGENTS.md` if contracts changed.
 
 ## Project
 
