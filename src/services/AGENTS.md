@@ -8,8 +8,8 @@ Business logic: window lifecycle, check-ins, streaks, scheduling, LLM orchestrat
 
 | Module | Role |
 |--------|------|
-| `window.ts` | `openWindow` / `closeWindow` / `maybeCloseWindowIfComplete`; stale post cleanup on open |
-| `scheduler.ts` | Per-chat cron (open) + setTimeout (close) + minute cron (expired posts) |
+| `window.ts` | `openWindow` / `closeWindow` / `maybeCloseWindowIfComplete` |
+| `scheduler.ts` | Per-chat cron (open) + setTimeout (close) + minute cron (pledge cleanup) |
 | `members.ts` | Roster, `recordCheckin`, live LLM refresh trigger |
 | `checkin-status.ts` | Prior-day status + grace-gated resolution |
 | `streak.ts` | Dual sober/intox streaks, `detectTodayEvent` |
@@ -21,7 +21,7 @@ Business logic: window lifecycle, check-ins, streaks, scheduling, LLM orchestrat
 | `summary.ts` | Close summary (reply to window message) |
 | `window-message.ts` | Window body shape + footer |
 | `milestone.ts`, `nudge.ts`, `momentum.ts`, `pledge.ts` | Retention hooks (SPEC §4.3) |
-| `chat-snippets.ts`, `llm-generations.ts`, `bot-posts.ts` | LLM context + post tracking |
+| `chat-snippets.ts`, `llm-generations.ts` | LLM context |
 | `highlights.ts` | Live highlight helpers |
 | `rules.ts` | Static `/rules` + welcome copy (`buildRulesText`) |
 | `roster-lifecycle.ts` | Roster deactivate + early window close |
@@ -34,7 +34,7 @@ Only `SchedulerService` is a class.
 
 **LLM optional:** no `OPENAI_API_KEY` → static Russian text. LLM fail → keep prior body or `DEFAULT_QUESTION`. Never crash on LLM errors.
 
-**Chat invariants** (SPEC §2.7): bot messages not deleted proactively (except optional `/stats` TTL); summary replies to window; close edits in place with «Окно закрыто.»
+**Chat invariants** (SPEC §2.7): bot messages never deleted proactively; summary replies to window; close edits in place with «Окно закрыто.»
 
 ## Work Guidance
 

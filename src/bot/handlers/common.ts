@@ -1,9 +1,7 @@
 import type { Bot } from "grammy";
 import { DateTime } from "luxon";
-import { env } from "../../env.ts";
-import { trackBotPost } from "../../services/bot-posts.ts";
 import { buildStatsPayload } from "../../services/highlights.ts";
-import { formatStatsFallback, generatePersonalStats } from "../../services/llm.ts";
+import { formatStatsFallback, generatePersonalStats, sendLlmMessage } from "../../services/llm.ts";
 import { buildLlmBaseContext } from "../../services/llm-context.ts";
 import { recordLlmGeneration } from "../../services/llm-generations.ts";
 import { ensureMember, getChatByTelegramId, joinChatMember } from "../../services/members.ts";
@@ -134,14 +132,7 @@ export function registerCommonHandlers(bot: Bot<BotContext>): void {
       await recordLlmGeneration({ db: ctx.db, chatId: chat.id, kind: "stats", text: llmText });
     }
 
-    const message = await ctx.reply(text);
-    await trackBotPost({
-      db: ctx.db,
-      chatId: chat.id,
-      telegramMessageId: message.message_id,
-      kind: "stats",
-      deleteAfter: DateTime.utc().plus({ minutes: env.STATS_TTL_MINUTES }),
-    });
+    await sendLlmMessage(ctx.api, ctx.chat.id, text);
   });
 
   bot.command("status", async (ctx) => {
@@ -169,7 +160,6 @@ export function registerCommonHandlers(bot: Bot<BotContext>): void {
 
     const mention = formatMemberMention(member.username, member.displayName);
     const { alreadyPledged } = await postPledge({
-      db: ctx.db,
       api: ctx.api,
       chat,
       memberId,
@@ -198,13 +188,6 @@ export function registerCommonHandlers(bot: Bot<BotContext>): void {
     const entries = await buildGroupMomentum(ctx.db, chat.id, today);
     const text = formatMomentumBoard(entries);
 
-    const message = await ctx.reply(text);
-    await trackBotPost({
-      db: ctx.db,
-      chatId: chat.id,
-      telegramMessageId: message.message_id,
-      kind: "command",
-      deleteAfter: DateTime.utc().plus({ minutes: env.STATS_TTL_MINUTES }),
-    });
+    await ctx.reply(text);
   });
 }

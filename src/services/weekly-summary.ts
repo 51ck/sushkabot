@@ -4,8 +4,7 @@ import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
 import { type Chat, chatMembers, checkins, members } from "../db/schema.ts";
 import { normalizeCheckinStatus } from "../types.ts";
-import { trackBotPost } from "./bot-posts.ts";
-import { generateWeeklySummaryText } from "./llm.ts";
+import { generateWeeklySummaryText, sendLlmMessage } from "./llm.ts";
 import { buildMemberStats } from "./streak.ts";
 import { getMemberCheckinHistory } from "./summary.ts";
 import { formatMemberMention } from "./window-message.ts";
@@ -80,11 +79,5 @@ export async function postWeeklySummary(params: {
 
   const text = `📅 Неделя ${fromDate} — ${toDate}\n\n${body}`;
 
-  const message = await api.sendMessage(Number(chat.telegramChatId), text);
-  await trackBotPost({
-    db,
-    chatId: chat.id,
-    telegramMessageId: message.message_id,
-    kind: "command",
-  });
+  await sendLlmMessage(api, Number(chat.telegramChatId), text);
 }

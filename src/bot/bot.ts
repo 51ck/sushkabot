@@ -5,10 +5,10 @@ import { chats } from "../db/schema.ts";
 import { SchedulerService } from "../services/scheduler.ts";
 import type { BotContext } from "./context.ts";
 import { registerChatLogHandlers } from "./handlers/chat-log.ts";
+import { registerChatReplyHandlers } from "./handlers/chat-reply.ts";
 import { registerCheckinHandlers } from "./handlers/checkin.ts";
 import { registerCommonHandlers } from "./handlers/common.ts";
 import { registerDevHandlers } from "./handlers/dev.ts";
-import { registerReactionHandlers } from "./handlers/reactions.ts";
 import { registerSettingsHandlers } from "./handlers/settings.ts";
 import { registerSetupWizardHandlers } from "./handlers/setup-wizard.ts";
 import { registerWelcomeHandlers } from "./handlers/welcome.ts";
@@ -29,10 +29,10 @@ export function createBot(
 
   registerCommonHandlers(bot);
   registerChatLogHandlers(bot);
-  registerReactionHandlers(bot);
   registerSetupWizardHandlers(bot);
   registerSettingsHandlers(bot);
   registerCheckinHandlers(bot);
+  registerChatReplyHandlers(bot);
   registerDevHandlers(bot);
   registerWelcomeHandlers(bot);
 

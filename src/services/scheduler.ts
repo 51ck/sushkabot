@@ -4,7 +4,6 @@ import type { Api, Bot } from "grammy";
 import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
 import { type Chat, chats, type DailyWindow, dailyWindows } from "../db/schema.ts";
-import { cleanupExpiredBotPosts } from "./bot-posts.ts";
 import { sendNudge } from "./nudge.ts";
 import { cleanupOldPledges } from "./pledge.ts";
 import { postWeeklySummary } from "./weekly-summary.ts";
@@ -40,7 +39,6 @@ export class SchedulerService {
     }
 
     this.maintenanceCron = new Cron("* * * * *", { protect: true }, async () => {
-      await cleanupExpiredBotPosts({ db: this.db, api: this.getApi() });
       cleanupOldPledges(DateTime.utc().toISODate() ?? "");
     });
   }

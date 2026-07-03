@@ -78,31 +78,6 @@ export const dailyWindows = sqliteTable(
   ],
 );
 
-export const botPosts = sqliteTable(
-  "bot_posts",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    chatId: integer("chat_id")
-      .notNull()
-      .references(() => chats.id, { onDelete: "cascade" }),
-    telegramMessageId: integer("telegram_message_id").notNull(),
-    kind: text("kind").notNull(),
-    dailyWindowId: integer("daily_window_id").references(() => dailyWindows.id, {
-      onDelete: "set null",
-    }),
-    postedAt: text("posted_at").notNull().default(sql`(datetime('now'))`),
-    hasReply: integer("has_reply", { mode: "boolean" }).notNull().default(false),
-    hasReaction: integer("has_reaction", { mode: "boolean" }).notNull().default(false),
-    deleteAfter: text("delete_after"),
-    deletedAt: text("deleted_at"),
-  },
-  (table) => [
-    uniqueIndex("bot_posts_chat_message_idx").on(table.chatId, table.telegramMessageId),
-    index("bot_posts_chat_kind_idx").on(table.chatId, table.kind),
-    index("bot_posts_delete_after_idx").on(table.deleteAfter),
-  ],
-);
-
 export const chatSnippets = sqliteTable(
   "chat_snippets",
   {
@@ -160,7 +135,6 @@ export const chatsRelations = relations(chats, ({ many }) => ({
   chatMembers: many(chatMembers),
   dailyWindows: many(dailyWindows),
   checkins: many(checkins),
-  botPosts: many(botPosts),
   chatSnippets: many(chatSnippets),
   llmGenerations: many(llmGenerations),
 }));
@@ -189,22 +163,12 @@ export const checkinsRelations = relations(checkins, ({ one }) => ({
   member: one(members, { fields: [checkins.memberId], references: [members.id] }),
 }));
 
-export const botPostsRelations = relations(botPosts, ({ one }) => ({
-  chat: one(chats, { fields: [botPosts.chatId], references: [chats.id] }),
-  dailyWindow: one(dailyWindows, {
-    fields: [botPosts.dailyWindowId],
-    references: [dailyWindows.id],
-  }),
-}));
-
 export type Chat = typeof chats.$inferSelect;
 export type Member = typeof members.$inferSelect;
 export type ChatMember = typeof chatMembers.$inferSelect;
 export type DailyWindow = typeof dailyWindows.$inferSelect;
 export type Checkin = typeof checkins.$inferSelect;
-export type BotPost = typeof botPosts.$inferSelect;
 export type ChatSnippet = typeof chatSnippets.$inferSelect;
 export type LlmGeneration = typeof llmGenerations.$inferSelect;
 
-export type BotPostKind = "window" | "summary" | "stats" | "command";
-export type LlmGenerationKind = "open" | "live" | "summary" | "stats";
+export type LlmGenerationKind = "open" | "live" | "summary" | "stats" | "chat";

@@ -4,6 +4,7 @@ Append-only history of product spec changes. Current spec: [`../SPEC.md`](../SPE
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 0.8.0 | 2026-07 | Remove bot_posts auto-delete; settings close summary; LLM Telegram HTML; contextual chat replies |
 | 0.7.2 | 2026-07 | Auto roster removal when user leaves Telegram group |
 | 0.7.1 | 2026-07 | `/join` `/leave` handlers; explicit roster; early close when all joined answered |
 | 0.7.0 | 2026-07 | `grace_min_sober_days` per chat (default 7); grace gate on Оступился/silence; LLM schedule context |

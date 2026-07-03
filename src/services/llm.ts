@@ -1,4 +1,5 @@
 import { env, isDevEnv } from "../env.ts";
+import { buildChatReplyUserPrompt, type ChatReplyLlmContext } from "../prompts/chat-reply.ts";
 import {
   buildLiveWindowUserPrompt,
   buildStatsUserPrompt,
@@ -17,6 +18,7 @@ import {
   type WeeklyLlmContext,
 } from "../prompts/weekly.ts";
 import { DEFAULT_QUESTION } from "../types.ts";
+import { sendLlmMessage } from "../utils/telegram-format.ts";
 import type { StatsPromptPayload, WindowHighlightContext } from "./highlights.ts";
 
 const REQUEST_TIMEOUT_MS = 8000;
@@ -206,6 +208,19 @@ export async function generateWeeklySummaryText(ctx: WeeklyLlmContext): Promise<
     "weekly",
   );
 }
+
+export async function generateChatReply(ctx: ChatReplyLlmContext): Promise<string | null> {
+  const system = await loadSystemPrompt("chat");
+  return chatComplete(
+    [
+      { role: "system", content: system },
+      { role: "user", content: buildChatReplyUserPrompt(ctx) },
+    ],
+    "chat",
+  );
+}
+
+export { sendLlmMessage };
 
 export function sanitizeStatsBody(text: string): string {
   let body = text.trim();

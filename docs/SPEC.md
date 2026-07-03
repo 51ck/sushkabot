@@ -1,6 +1,6 @@
 # Sushkabot — Product Spec
 
-**Version:** 0.7.2 | **Changelog:** [`docs/changelog/SPEC.md`](changelog/SPEC.md) | **Deploy:** [`docs/DEPLOY.md`](DEPLOY.md)
+**Version:** 0.8.0 | **Changelog:** [`docs/changelog/SPEC.md`](changelog/SPEC.md) | **Deploy:** [`docs/DEPLOY.md`](DEPLOY.md)
 
 Agent-ready product contract. Prompt text: [`src/prompts/system.md`](../src/prompts/system.md). Backlog: [`docs/IDEAS.md`](IDEAS.md).
 
@@ -127,7 +127,7 @@ LLM failure → keep prior body or static fallback; never crash.
 
 ### 2.7 Chat invariants
 
-- Bot messages **not deleted** proactively (except optional `/stats` TTL)
+- Bot messages **never deleted** proactively
 - Summary **replies** to window message
 - Window at close → edit in place, buttons removed, footer «Окно закрыто.»
 - One window per chat per calendar day (`checkin_date` = open day in chat TZ)
@@ -146,13 +146,13 @@ LLM failure → keep prior body or static fallback; never crash.
 
 - Settings wizard (`/setup`, `/config`): time, timezone, window duration
 - Daily open/close window; two check-in buttons
-- LLM: open, live, summary, `/stats` — shared context (schedule, snippets, roster+quality, style examples)
+- LLM: open, live, summary, `/stats`, contextual chat replies — shared context (schedule, snippets, roster+quality, style examples)
 - Commands: `/stats`, `/board`, `/pledge`, `/rules`, `/help`; DM `/settings` timezone
 - Mid-window nudge when `nudge_enabled` (50% of window elapsed)
 - Milestone posts at 7/30/90 sober days on window close
 - Dual streaks, streak quality, hollow milestones
-- Chat snippets for LLM; `bot_posts` tracking; `/stats` ephemeral TTL
-- Reaction + reply tracking on bot posts
+- Chat snippets for LLM context
+- Contextual LLM replies on @mention or reply to bot (LLM may SKIP)
 - Dev: `/force_open`, `/force_close` when `BOT_ENV=development`
 - Docker + GHCR deploy ([`DEPLOY.md`](DEPLOY.md))
 
@@ -166,7 +166,6 @@ LLM failure → keep prior body or static fallback; never crash.
 | Group weekly rollups | Phase 3 |
 | Live countdown in footer | Stale after debounced edit; footer shows local close time only |
 | Per-person window times | v2 |
-| Contextual LLM replies to chat | Future |
 | Webhook mode | Long polling only |
 | LLM nudge/milestone copy | Static fallbacks today; Wave 2 |
 
@@ -176,9 +175,9 @@ LLM failure → keep prior body or static fallback; never crash.
 
 ### 4.1 Onboarding
 
-Admin `/setup` or `/config` → inline wizard (one message, in-place edits). Defaults: 21:00, Europe/Moscow, 120 min window, grace after 7 sober days. Save registers scheduler. Question/buttons not configurable.
+Admin `/setup` or `/config` → inline wizard (one message, in-place edits). Defaults: 21:00, Europe/Moscow, 120 min window, grace after 7 sober days. Save registers scheduler. Question/buttons not configurable. Closing `/config` shows current settings summary.
 
-New member joins → welcome reply with same rules text as `/rules` (ephemeral TTL 4h). `/rules` → static rules text with chat check-in time when configured (ephemeral TTL 24h).
+New member joins → welcome reply with same rules text as `/rules`. `/rules` → static rules text with chat check-in time when configured.
 
 ### 4.2 Check-in window
 
@@ -189,6 +188,8 @@ New member joins → welcome reply with same rules text as `/rules` (ephemeral T
 **Roster:** `/join` adds tracking; `/leave` removes (past check-ins kept). Check-in buttons only for joined members. Leaving the Telegram group auto-removes from roster (same as `/leave`); rejoining the group does **not** auto-enroll — `/join` again.
 
 **Close:** auto absent status for silent joined members; edit window (never delete); status `closed`; post summary as **reply** to window; optional milestone posts; status `summarized`.
+
+**Contextual replies:** @mention or reply to bot → LLM with full shared context; output `SKIP` → no message. Bot ignores own messages.
 
 **Message shape (window):**
 
@@ -219,17 +220,17 @@ Closed: same body + «Окно закрыто.»; buttons removed.
 |---------|-------|-----|----------|
 | `/setup` | Group | Admin | Wizard; draft until Save |
 | `/config` | Group | Admin | Wizard; auto-save per field |
-| `/stats` | Group | Anyone | Personal LLM stats; ephemeral TTL |
+| `/stats` | Group | Anyone | Personal LLM stats |
 | `/board` | Group | Anyone | Group momentum board |
 | `/pledge` | Group | Anyone | Daily commitment post |
-| `/rules` | Group | Anyone | Static rules: two buttons, grace/escalation, milestones; ephemeral TTL 24h |
+| `/rules` | Group | Anyone | Static rules: two buttons, grace/escalation, milestones |
 | `/join` | Group | Anyone | Join group tracking roster |
 | `/leave` | Group | Anyone | Leave roster; past check-ins kept |
 | `/help` | Anywhere | Anyone | Command list |
 | `/settings` | DM | Anyone | Personal timezone picker |
 | `/force_open` / `/force_close` | Group | Env admin | Dev only |
 
-**Telegram requirements:** supergroup admin (delete for `/stats` TTL); Privacy Mode off; post + edit messages.
+**Telegram requirements:** supergroup admin; Privacy Mode off; post + edit messages.
 
 **Menu (`setMyCommands`):** group — stats, pledge, board, rules, join, leave, help; admins — + setup, config (+ dev force_open/close); DM — settings, help.
 
@@ -267,19 +268,19 @@ Priority under budget: flow-specific → snippets → roster → style examples.
 
 OpenAI-compatible API. Optional (`OPENAI_API_KEY`). Temperature 0.9, timeout 8s. DeepSeek: `thinking: disabled`. Debug logs at `LOG_LEVEL=debug`.
 
+LLM output may use Telegram HTML subset (`<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<pre>`, `<tg-spoiler>`, `<a href>`). Parse errors → plain text fallback.
+
 ---
 
 ## 7. Data Model
 
 SQLite via Drizzle. Telegram IDs as `text`.
 
-**Core tables:** `chats`, `members`, `chat_members`, `daily_windows`, `checkins`, `bot_posts`, `chat_snippets`, `llm_generations`.
+**Core tables:** `chats`, `members`, `chat_members`, `daily_windows`, `checkins`, `chat_snippets`, `llm_generations`.
 
 **`checkins.status`:** `sober` | `minor_slip` | `major_slip`
 
 **`daily_windows.status`:** `open` → `closed` → `summarized`
-
-**`bot_posts.kind`:** `window` | `summary` | `stats` | `command`
 
 One check-in per member per window. Unique `(chat_id, checkin_date)` per window.
 
@@ -316,7 +317,6 @@ Window may cross midnight; `checkin_date` stays open day. Second cron same day: 
 | `LLM_CHAT_CONTEXT_COUNT` | `30` | Snippets sent (trimmed by budget) |
 | `CHAT_SNIPPET_LIMIT` | `50` | DB ring buffer |
 | `LLM_STYLE_EXAMPLES` | `5` | Style examples per kind |
-| `STATS_TTL_MINUTES` | `30` | Ephemeral `/stats` |
 | `HIGHLIGHT_FULL_LIST_MAX` | `5` | Full vs highlights_only |
 
 See [`README.md`](../README.md) for dev setup.
@@ -341,7 +341,8 @@ See [`README.md`](../README.md) for dev setup.
 | LLM timeout | Prior body or fallback |
 | Summary post | Reply to window `message_id` |
 | Alternating KmKmK pattern | `grace-heavy`; `hollow_milestone` not full celebration |
-| `/stats` before TTL + reply | Kept (`has_reply`) |
+| @mention or reply to bot | LLM reply with full context, or SKIP (no message) |
+| Bot reply loop | Ignore own messages; LLM must not @mention self |
 
 ---
 
@@ -359,6 +360,8 @@ See [`README.md`](../README.md) for dev setup.
 | `src/services/context-budget.ts` | Token budget trim |
 | `src/services/streak.ts` | Streaks + highlight events |
 | `src/services/llm.ts` | API client |
+| `src/utils/telegram-format.ts` | LLM HTML parse_mode + fallback |
+| `src/bot/handlers/chat-reply.ts` | Contextual LLM replies |
 | `src/types.ts` | Buttons, statuses, resolution |
 | `src/bot/handlers/` | grammY handlers |
 | `docs/DEPLOY.md` | Ops runbook |
