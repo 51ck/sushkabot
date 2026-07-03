@@ -4,8 +4,7 @@ import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
 import { type Chat, chatMembers, checkins, dailyWindows } from "../db/schema.ts";
 import { type CheckinStatus, normalizeCheckinStatus } from "../types.ts";
-import { trackBotPost } from "./bot-posts.ts";
-import { generateSummaryIntro } from "./llm.ts";
+import { generateSummaryIntro, sendLlmMessage } from "./llm.ts";
 import { buildLlmBaseContext } from "./llm-context.ts";
 import { recordLlmGeneration } from "./llm-generations.ts";
 import { countAnswered, countJoinedMembers } from "./members.ts";
@@ -90,14 +89,7 @@ export async function postSummary(params: {
     sendParams.reply_parameters = { message_id: window.messageId };
   }
 
-  const message = await api.sendMessage(Number(chat.telegramChatId), text, sendParams);
-  await trackBotPost({
-    db,
-    chatId: chat.id,
-    telegramMessageId: message.message_id,
-    kind: "summary",
-    dailyWindowId: window.id,
-  });
+  await sendLlmMessage(api, Number(chat.telegramChatId), text, sendParams);
 }
 
 async function getMemberCheckinHistory(

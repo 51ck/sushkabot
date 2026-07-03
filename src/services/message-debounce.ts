@@ -1,5 +1,6 @@
 import type { Api, InlineKeyboard } from "grammy";
 import { env } from "../env.ts";
+import { editLlmMessage } from "../utils/telegram-format.ts";
 
 const editPending = new Map<string, ReturnType<typeof setTimeout>>();
 const llmPending = new Map<string, ReturnType<typeof setTimeout>>();
@@ -24,7 +25,7 @@ export async function debouncedEditMessage(
     const timer = setTimeout(async () => {
       editPending.delete(key);
       try {
-        await api.editMessageText(params.chat_id, params.message_id, params.text, {
+        await editLlmMessage(api, params.chat_id, params.message_id, params.text, {
           reply_markup: params.reply_markup,
         });
       } catch {

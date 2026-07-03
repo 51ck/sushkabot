@@ -3,7 +3,7 @@ import type { Api } from "grammy";
 import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
 import { type Chat, chats, dailyWindows } from "../db/schema.ts";
-import { trackBotPost } from "./bot-posts.ts";
+import { editLlmMessage, sendLlmMessage } from "../utils/telegram-format.ts";
 import { generateCheckinBody, isLlmFallbackText } from "./llm.ts";
 import { buildLlmBaseContext } from "./llm-context.ts";
 import { recordLlmGeneration } from "./llm-generations.ts";
@@ -148,7 +148,7 @@ export async function openWindow(params: {
     });
 
     if (!windowRow.messageId) {
-      const message = await api.sendMessage(Number(chat.telegramChatId), text, {
+      const message = await sendLlmMessage(api, Number(chat.telegramChatId), text, {
         reply_markup: replyMarkup,
       });
 
@@ -157,18 +157,10 @@ export async function openWindow(params: {
         .set({ messageId: message.message_id })
         .where(eq(dailyWindows.id, windowRow.id));
 
-      await trackBotPost({
-        db,
-        chatId: chat.id,
-        telegramMessageId: message.message_id,
-        kind: "window",
-        dailyWindowId: windowRow.id,
-      });
-
       windowRow = { ...windowRow, messageId: message.message_id };
     } else {
       try {
-        await api.editMessageText(Number(chat.telegramChatId), windowRow.messageId, text, {
+        await editLlmMessage(api, Number(chat.telegramChatId), windowRow.messageId, text, {
           reply_markup: replyMarkup,
         });
       } catch {
@@ -218,7 +210,7 @@ export async function closeWindow(params: {
     });
 
     try {
-      await api.editMessageText(Number(chat.telegramChatId), window.messageId, text);
+      await editLlmMessage(api, Number(chat.telegramChatId), window.messageId, text);
     } catch {
       // ignore
     }
