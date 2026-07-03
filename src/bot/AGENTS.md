@@ -17,9 +17,9 @@ Telegram transport: handler registration, inline keyboards, safe edits. Business
 
 **Handler registration order** (`bot.ts`) — order matters:
 
-1. common → chat-log → reactions → setup-wizard → settings → checkin → dev → welcome
+1. common → chat-log → setup-wizard → settings → checkin → chat-reply → dev → welcome
 
-Chat-log before checkin (reply tracking on bot posts).
+Chat-log before checkin (snippet logging). Chat-reply after chat-log (LLM contextual replies).
 
 **Callback prefixes:**
 

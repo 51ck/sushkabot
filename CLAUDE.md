@@ -43,7 +43,7 @@ pnpm db:migrate             # Run migrations manually (auto-runs on bot start)
 ## Architecture
 
 ### Boot sequence (`src/index.ts`)
-`createDatabase` → `runMigrations` → `initDb` → `createBot` → `scheduler.start()` → `registerBotCommands` → `bot.start()` (long polling with reactions in `allowed_updates`)
+`createDatabase` → `runMigrations` → `initDb` → `createBot` → `scheduler.start()` → `registerBotCommands` → `bot.start()` (long polling)
 
 ### Key layers
 
@@ -61,7 +61,7 @@ pnpm db:migrate             # Run migrations manually (auto-runs on bot start)
 - **`drizzle/`** — sequential SQL migrations (auto on start)
 
 ### Handler registration order matters
-`src/bot/bot.ts`: common → chat-log → reactions → setup-wizard → settings → checkin → dev. Chat-log before checkin for reply tracking.
+`src/bot/bot.ts`: common → chat-log → setup-wizard → settings → checkin → chat-reply → dev. Chat-log before checkin for snippet logging.
 
 ### Callback data prefixes
 - `checkin:` — button taps (`krasavchik`, `ostupilsya`)

@@ -13,7 +13,7 @@ Sushkabot application: Telegram bot (grammY), business logic, SQLite persistence
 
 **Stack:** Bun 1.x, TypeScript 7 (`tsgo`), pnpm, grammY, Drizzle + `bun:sqlite`, croner, Luxon, optional OpenAI-compatible LLM.
 
-**Boot** (`index.ts`): `createDatabase` → `runMigrations` → `initDb` → `createBot` → `scheduler.start()` → `registerBotCommands` → `bot.start()` (long polling, reactions in `allowed_updates`).
+**Boot** (`index.ts`): `createDatabase` → `runMigrations` → `initDb` → `createBot` → `scheduler.start()` → `registerBotCommands` → `bot.start()` (long polling).
 
 **Layers:** `bot/` (Telegram) → `services/` (logic) → `db/` (persistence). `prompts/` for LLM text builders + `system.md`.
 
