@@ -94,6 +94,22 @@ function buildMenuText(mode: "setup" | "config", draft: WizardDraft): string {
   ].join("\n");
 }
 
+function buildSettingsSummaryLines(draft: WizardDraft): string[] {
+  return [
+    `⏰ ${formatTime(draft)} ${draft.timezone}`,
+    `⏳ окно ${draft.windowDurationMinutes} мин`,
+    `🛡 грейс от ${formatGraceMinSoberDays(draft.graceMinSoberDays)}`,
+    `🔔 напоминалка ${draft.nudgeEnabled ? "вкл" : "выкл"}`,
+  ];
+}
+
+function buildSettingsCloseText(mode: "setup" | "config", draft: WizardDraft): string {
+  if (mode === "setup") {
+    return "Настройка отменена.";
+  }
+  return ["Настройки:", "", ...buildSettingsSummaryLines(draft)].join("\n");
+}
+
 function buildScreenText(
   screen: WizardScreen,
   draft: WizardDraft,
@@ -377,7 +393,7 @@ export function registerSetupWizardHandlers(bot: Bot<BotContext>): void {
         await ctx.api.editMessageText(
           Number(session.telegramChatId),
           session.messageId,
-          session.mode === "setup" ? "Настройка отменена." : "Настройки закрыты.",
+          buildSettingsCloseText(session.mode, session.draft),
         );
         await ctx.answerCallbackQuery();
         return;
@@ -392,13 +408,7 @@ export function registerSetupWizardHandlers(bot: Bot<BotContext>): void {
         await ctx.api.editMessageText(
           Number(session.telegramChatId),
           session.messageId,
-          [
-            texts.setupDone,
-            "",
-            `⏰ ${formatTime(session.draft)} ${session.draft.timezone}`,
-            `⏳ окно ${session.draft.windowDurationMinutes} мин`,
-            `🛡 грейс от ${formatGraceMinSoberDays(session.draft.graceMinSoberDays)}`,
-          ].join("\n"),
+          [texts.setupDone, "", ...buildSettingsSummaryLines(session.draft)].join("\n"),
         );
         await ctx.answerCallbackQuery({ text: "Сохранено ✅" });
         return;
