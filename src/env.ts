@@ -21,7 +21,6 @@ export const env = createEnv({
     OPENAI_API_BASE: z.string().url().default("https://api.openai.com/v1"),
     OPENAI_MODEL: z.string().default("gpt-4o-mini"),
     LLM_DEBOUNCE_MS: z.coerce.number().int().nonnegative().default(6000),
-    STATS_TTL_MINUTES: z.coerce.number().int().positive().default(30),
     HIGHLIGHT_FULL_LIST_MAX: z.coerce.number().int().positive().default(5),
     CHAT_SNIPPET_LIMIT: z.coerce.number().int().positive().default(50),
     LLM_CHAT_CONTEXT_COUNT: z.coerce.number().int().positive().default(30),

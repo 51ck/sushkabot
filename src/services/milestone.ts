@@ -4,7 +4,6 @@ import type { AppDatabase } from "../db/client.ts";
 import type { Chat, DailyWindow } from "../db/schema.ts";
 import { checkins } from "../db/schema.ts";
 import { normalizeCheckinStatus } from "../types.ts";
-import { trackBotPost } from "./bot-posts.ts";
 import { calculateSoberStreak } from "./streak.ts";
 import { getMemberCheckinHistory } from "./summary.ts";
 import { formatMemberMention } from "./window-message.ts";
@@ -84,12 +83,5 @@ export async function postMilestoneCelebrations(params: {
 
   const text = buildMilestoneFallback(milestones);
 
-  const message = await api.sendMessage(Number(chat.telegramChatId), text);
-  await trackBotPost({
-    db,
-    chatId: chat.id,
-    telegramMessageId: message.message_id,
-    kind: "command",
-    dailyWindowId: window.id,
-  });
+  await api.sendMessage(Number(chat.telegramChatId), text);
 }

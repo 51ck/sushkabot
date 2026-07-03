@@ -1,9 +1,6 @@
-import { and, eq } from "drizzle-orm";
 import type { Api } from "grammy";
 import { DateTime } from "luxon";
-import type { AppDatabase } from "../db/client.ts";
-import { type Chat, dailyWindows } from "../db/schema.ts";
-import { trackBotPost } from "./bot-posts.ts";
+import type { Chat } from "../db/schema.ts";
 
 const PLEDGE_MESSAGES = [
   "заявляет: сегодня красавчик 💪",
@@ -37,14 +34,13 @@ function markPledged(chatId: number, memberId: number, date: string): void {
 }
 
 export async function postPledge(params: {
-  db: AppDatabase;
   api: Api;
   chat: Chat;
   memberId: number;
   mention: string;
   today: string;
 }): Promise<{ alreadyPledged: boolean }> {
-  const { db, api, chat, memberId, mention, today } = params;
+  const { api, chat, memberId, mention, today } = params;
 
   if (hasPledgedToday(chat.id, memberId, today)) {
     return { alreadyPledged: true };
@@ -57,23 +53,7 @@ export async function postPledge(params: {
     PLEDGE_MESSAGES[dayOfYear % PLEDGE_MESSAGES.length] ?? "заявляет: сегодня красавчик 💪";
   const text = `${mention} ${template}`;
 
-  const window = await db.query.dailyWindows.findFirst({
-    where: and(eq(dailyWindows.chatId, chat.id), eq(dailyWindows.checkinDate, today)),
-  });
-
-  const deleteAfter = window?.windowClosesAt
-    ? DateTime.fromISO(window.windowClosesAt, { zone: "utc" }).plus({ minutes: 10 })
-    : DateTime.utc().plus({ hours: 12 });
-
-  const message = await api.sendMessage(Number(chat.telegramChatId), text);
-  await trackBotPost({
-    db,
-    chatId: chat.id,
-    telegramMessageId: message.message_id,
-    kind: "command",
-    dailyWindowId: window?.id ?? null,
-    deleteAfter,
-  });
+  await api.sendMessage(Number(chat.telegramChatId), text);
 
   return { alreadyPledged: false };
 }

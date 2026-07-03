@@ -3,7 +3,6 @@ import type { Api } from "grammy";
 import { DateTime } from "luxon";
 import type { AppDatabase } from "../db/client.ts";
 import { type Chat, chatMembers, checkins, type DailyWindow } from "../db/schema.ts";
-import { trackBotPost } from "./bot-posts.ts";
 
 const NUDGE_MESSAGES = [
   "Кнопки ждут. Не прячьтесь 👀",
@@ -38,16 +37,5 @@ export async function sendNudge(params: {
   const dayOfYear = DateTime.fromISO(window.checkinDate).ordinal ?? 0;
   const text = NUDGE_MESSAGES[dayOfYear % NUDGE_MESSAGES.length] ?? "Кнопки ждут 👀";
 
-  const closesAt = DateTime.fromISO(window.windowClosesAt, { zone: "utc" });
-  const deleteAfter = closesAt.plus({ minutes: 5 });
-
-  const message = await api.sendMessage(Number(chat.telegramChatId), text);
-  await trackBotPost({
-    db,
-    chatId: chat.id,
-    telegramMessageId: message.message_id,
-    kind: "command",
-    dailyWindowId: window.id,
-    deleteAfter,
-  });
+  await api.sendMessage(Number(chat.telegramChatId), text);
 }

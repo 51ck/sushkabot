@@ -1,5 +1,4 @@
 import type { Bot } from "grammy";
-import { markBotPostReplied } from "../../services/bot-posts.ts";
 import { appendChatSnippet } from "../../services/chat-snippets.ts";
 import { getChatByTelegramId } from "../../services/members.ts";
 import type { BotContext } from "../context.ts";
@@ -16,11 +15,6 @@ export function registerChatLogHandlers(bot: Bot<BotContext>): void {
     if (!chat) {
       await next();
       return;
-    }
-
-    const replyTo = ctx.message.reply_to_message;
-    if (replyTo?.message_id) {
-      await markBotPostReplied(ctx.db, chat.id, replyTo.message_id);
     }
 
     const text = ctx.message.text ?? ctx.message.caption;

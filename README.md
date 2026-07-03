@@ -56,7 +56,6 @@ Old check-in/summary/stats bot messages without replies are deleted when a new w
 | `OPENAI_API_BASE` | `https://api.openai.com/v1` | OpenAI-compatible API |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Model id |
 | `LLM_DEBOUNCE_MS` | `6000` | Delay before live window regen after answers |
-| `STATS_TTL_MINUTES` | `30` | `/stats` message TTL without replies |
 | `HIGHLIGHT_FULL_LIST_MAX` | `5` | List all answerers in LLM prompt up to this count |
 | `CHAT_SNIPPET_LIMIT` | `20` | Stored recent group messages per chat |
 | `LLM_STYLE_EXAMPLES` | `5` | Past generations fed as style context |
